@@ -49,7 +49,7 @@ if selected_subjects:
             background-color: #ffffff;
         }
         </style>
-    """, unsafe_unsafe_with_style=True)
+    """, unsafe_allow_html=True)
 
     for subject in selected_subjects:
         # Create a container row to separate each subject clearly
