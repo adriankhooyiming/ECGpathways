@@ -24,6 +24,10 @@ overlapping_subjects = [
 
 all_selectable_subjects = sorted(g3_only_subjects + overlapping_subjects)
 
+# Grade scale definitions
+g3_grades = ["A1", "A2", "B3", "B4", "C5", "C6", "D7", "E8", "9"]
+g2_grades = ["1", "2", "3", "4", "5", "6"]
+
 # --- 2. STEP 1: SUBJECT ENTRY ---
 st.write("### Step 1: Select Your Subjects")
 selected_subjects = st.multiselect(
@@ -31,14 +35,15 @@ selected_subjects = st.multiselect(
     options=all_selectable_subjects
 )
 
+# Dictionaries to track final validated levels and grades
 subject_levels = {}
+subject_grades = {}
 
-# --- 3. STEP 2: PILL-BUTTON LEVEL RESOLUTION ---
+# --- 3. STEP 2: LEVEL & GRADE RESOLUTION ---
 if selected_subjects:
     st.write("---")
-    st.write("### Step 2: Assign Subject Levels")
+    st.write("### Step 2: Assign Subject Levels and Grades")
     
-    # Custom CSS to mimic the light card layout borders seen in your image
     st.markdown("""
         <style>
         .subject-row {
@@ -52,27 +57,25 @@ if selected_subjects:
     """, unsafe_allow_html=True)
 
     for subject in selected_subjects:
-        # Create a container row to separate each subject clearly
         with st.container():
-            # Create a 2-column layout (Left for text, Right for the buttons)
-            col1, col2 = st.columns([2, 1], vertical_alignment="center")
+            # col1 for Subject Name, col2 for Level buttons, col3 for Grade Dropdown
+            col1, col2, col3 = st.columns([2, 1.2, 1], vertical_alignment="center")
             
             with col1:
                 st.markdown(f"**{subject}**")
                 
+            # Determine Level Selection
             with col2:
                 if subject in overlapping_subjects:
-                    # Renders as selectable side-by-side pill buttons
                     chosen_level = st.segmented_control(
                         label=f"Level for {subject}",
                         options=["G2", "G3"],
                         default="G3",
-                        label_visibility="collapsed", # Hides label to match your image format
+                        label_visibility="collapsed",
                         key=f"level_{subject}"
                     )
                     subject_levels[subject] = chosen_level if chosen_level else "G3"
                 else:
-                    # For G3-only subjects, render a disabled single pill block
                     st.segmented_control(
                         label=f"Level for {subject}",
                         options=["G3"],
@@ -82,6 +85,19 @@ if selected_subjects:
                         key=f"level_{subject}"
                     )
                     subject_levels[subject] = "G3"
+            
+            # Determine Grade Selection based on chosen level
+            with col3:
+                current_level = subject_levels[subject]
+                available_grades = g3_grades if current_level == "G3" else g2_grades
+                
+                chosen_grade = st.selectbox(
+                    label=f"Grade for {subject}",
+                    options=available_grades,
+                    label_visibility="collapsed",
+                    key=f"grade_{subject}"
+                )
+                subject_grades[subject] = chosen_grade
 
     # --- 4. STEP 3: DYNAMIC COUNTING & EVALUATION ---
     st.write("---")
@@ -92,30 +108,41 @@ if selected_subjects:
     st.metric(label="Total G3 Subjects", value=g3_count)
     st.metric(label="Total G2 Subjects", value=g2_count)
     
-    jc_open = False
-    poly_y1_open = False
-    pfp_open = False
+    # Pathway status tracking
+    pathways = {
+        "Junior College": {"open": False, "reason": ""},
+        "Polytechnic Year 1": {"open": False, "reason": ""},
+        "Polytechnic Foundation Programme": {"open": False, "reason": ""}
+    }
     
+    # 1. Junior College Logic
     if g3_count >= 5:
-        jc_open = True
-        poly_y1_open = True
-        pfp_open = True
-    elif g3_count == 4 and g2_count >= 1:
-        poly_y1_open = True
-        pfp_open = True
-    elif g3_count <= 3 and g2_count >= 5:
-        pfp_open = True
-
-    st.write("### Eligible Pathways")
-    available_pathways = []
-    if jc_open: available_pathways.append("Junior College")
-    if poly_y1_open: available_pathways.append("Polytechnic Year 1")
-    if pfp_open: available_pathways.append("Polytechnic Foundation Programme")
-        
-    if available_pathways:
-        for pathway in available_pathways:
-            st.success(f"✅ **{pathway}** is open to you.")
+        pathways["Junior College"]["open"] = True
     else:
-        st.warning("Based on the current subject counts, no specific pathways are open.")
+        pathways["Junior College"]["reason"] = f"Requires at least 5 G3 subjects (You have {g3_count})."
+
+    # 2. Polytechnic Year 1 Logic
+    if g3_count >= 5 or (g3_count == 4 and g2_count >= 1):
+        pathways["Polytechnic Year 1"]["open"] = True
+    else:
+        if g3_count == 4:
+            pathways["Polytechnic Year 1"]["reason"] = f"You have 4 G3 subjects, but require at least 1 G2 subject (You have {g2_count})."
+        else:
+            pathways["Polytechnic Year 1"]["reason"] = f"Requires 5+ G3 subjects, OR exactly 4 G3 subjects with at least 1 G2 subject (You have {g3_count} G3)."
+
+    # 3. Polytechnic Foundation Programme Logic
+    if g3_count >= 5 or (g3_count == 4 and g2_count >= 1) or (g3_count <= 3 and g2_count >= 5):
+        pathways["Polytechnic Foundation Programme"]["open"] = True
+    else:
+        pathways["Polytechnic Foundation Programme"]["reason"] = f"Requires at least 5 G2 subjects when taking 3 or fewer G3 subjects (You have {g3_count} G3 and {g2_count} G2)."
+
+    # --- 5. DISPLAY PATHWAY STATUSES ---
+    st.write("### Pathway Eligibility Status")
+    
+    for name, info in pathways.items():
+        if info["open"]:
+            st.success(f"✅ **{name}** is **Available**")
+        else:
+            st.error(f"❌ **{name}** is **Not Available** \n*Reason: {info['reason']}*")
 else:
     st.info("Please choose your subjects above to calculate your eligibility.")
