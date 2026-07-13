@@ -104,16 +104,10 @@ if selected_subjects:
                 )
                 subject_grades[subject] = chosen_grade
 
-    # --- 4. STEP 3: DYNAMIC COUNTING & EVALUATION ---
-    st.write("---")
-    
+    # --- 4. DATA PROCESSING & EVALUATION ---
     g3_count = sum(1 for lvl in subject_levels.values() if lvl == "G3")
     g2_count = sum(1 for lvl in subject_levels.values() if lvl == "G2")
     total_g2_g3_count = g3_count + g2_count
-    
-    st.metric(label="Total G3 Subjects", value=g3_count)
-    st.metric(label="Total G2 Subjects", value=g2_count)
-    st.metric(label="Total Combined (G2 + G3) Subjects", value=total_g2_g3_count)
     
     pathways = {
         "Junior College": {"open": False, "reason": []},
@@ -125,7 +119,6 @@ if selected_subjects:
     jc_passed_rules = True
     jc_reasons = []
 
-    # A. Level-based structural requirements check first
     el_is_g3 = "English Language" in subject_levels and subject_levels["English Language"] == "G3"
     math_is_g3 = ("Mathematics" in subject_levels and subject_levels["Mathematics"] == "G3") or \
                  ("Additional Mathematics" in subject_levels and subject_levels["Additional Mathematics"] == "G3")
@@ -133,19 +126,15 @@ if selected_subjects:
     if not el_is_g3:
         jc_passed_rules = False
         jc_reasons.append("English Language must be taken at the G3 level.")
-        
     if not math_is_g3:
         jc_passed_rules = False
         jc_reasons.append("Mathematics or Additional Mathematics must be taken at the G3 level.")
-
     if g3_count < 5:
         jc_passed_rules = False
         jc_reasons.append(f"Requires at least 5 G3 subjects (You have {g3_count}).")
 
-    # B. Grade validations (Only check if their structural level rules pass)
     if el_is_g3:
-        el_grade = subject_grades["English Language"]
-        if not check_g3_at_least(el_grade, "C6"):
+        if not check_g3_at_least(subject_grades["English Language"], "C6"):
             jc_passed_rules = False
             jc_reasons.append("English Language at the G3 level should have a minimum grade of C6.")
 
@@ -163,7 +152,6 @@ if selected_subjects:
             jc_passed_rules = False
             jc_reasons.extend(math_failures)
 
-    # Mother Tongue Validation (Always checked assuming MT exists)
     mt_subjects = ["Chinese Language", "Malay Language", "Tamil Language", "Bengali", "Gujarati", "Hindi", "Panjabi", "Urdu"]
     hmt_subjects = ["Higher Chinese", "Higher Malay", "Higher Tamil"]
     has_mt_selected = False
@@ -202,33 +190,45 @@ if selected_subjects:
         else:
             jc_reasons.extend(mt_failures)
 
-    # Finalize Junior College Status
-    if jc_passed_rules:
-        pathways["Junior College"]["open"] = True
-    else:
-        pathways["Junior College"]["reason"] = jc_reasons
+    if jc_passed_rules: pathways["Junior College"]["open"] = True
+    else: pathways["Junior College"]["reason"] = jc_reasons
 
-    # --- OTHER PATHWAYS ---
-    # 2. Polytechnic Year 1 Logic
-    if g3_count >= 4:
-        pathways["Polytechnic Year 1"]["open"] = True
-    else:
-        pathways["Polytechnic Year 1"]["reason"] = [f"Requires at least 4 G3 subjects (You have {g3_count})."]
+    # --- POLYTECHNIC YEAR 1 LOGIC ---
+    if g3_count >= 4: pathways["Polytechnic Year 1"]["open"] = True
+    else: pathways["Polytechnic Year 1"]["reason"] = [f"Requires at least 4 G3 subjects (You have {g3_count})."]
 
-    # 3. Polytechnic Foundation Programme Logic
-    if total_g2_g3_count >= 5:
-        pathways["Polytechnic Foundation Programme"]["open"] = True
-    else:
-        pathways["Polytechnic Foundation Programme"]["reason"] = [f"Requires at least 5 subjects combined at G2 or G3 level (You have {total_g2_g3_count})."]
+    # --- PFP LOGIC ---
+    if total_g2_g3_count >= 5: pathways["Polytechnic Foundation Programme"]["open"] = True
+    else: pathways["Polytechnic Foundation Programme"]["reason"] = [f"Requires at least 5 subjects combined at G2 or G3 level (You have {total_g2_g3_count})."]
 
-    # --- 5. DISPLAY PATHWAY STATUSES ---
-    st.write("### Pathway Eligibility Status")
+    # Build list of strictly eligible pathways
+    eligible_options = [name for name, info in pathways.items() if info["open"]]
+
+    # --- 5. STEP 3: PATHWAY BUTTON SELECTION ---
+    st.write("---")
+    st.write("### Step 3: Select an Eligible Pathway to Explore")
     
-    for name, info in pathways.items():
-        if info["open"]:
-            st.success(f"✅ **{name}** is **Available**")
-        else:
-            reasons_list = "\n".join([f"- {r}" for r in info["reason"]])
-            st.error(f"❌ **{name}** is **Not Available** \n\n*Requirements Not Met:*\n{reasons_list}")
+    if eligible_options:
+        # Renders interactive buttons for available pathways only
+        chosen_pathway = st.segmented_control(
+            label="Select a pathway you are interested in learning:",
+            options=eligible_options,
+            key="selected_exploration_pathway"
+        )
+        
+        if chosen_pathway:
+            st.success(f"You have selected **{chosen_pathway}**. (Logic for exploring this pathway can go here!)")
+    else:
+        st.warning("You do not currently qualify for any pathways based on these grades.")
+
+    # --- 6. OPTIONAL ELIGIBILITY FEEDBACK LOGS ---
+    with st.expander("View Full Requirements Breakdown"):
+        for name, info in pathways.items():
+            if info["open"]:
+                st.write(f"✅ **{name}**: Available")
+            else:
+                st.write(f"❌ **{name}**: Not Available")
+                for r in info["reason"]:
+                    st.write(f"  - {r}")
 else:
     st.info("Please choose your subjects above to calculate your eligibility.")
