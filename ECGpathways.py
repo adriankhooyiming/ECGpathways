@@ -28,6 +28,16 @@ all_selectable_subjects = sorted(g3_only_subjects + overlapping_subjects)
 g3_grades = ["A1", "A2", "B3", "B4", "C5", "C6", "D7", "E8", "9"]
 g2_grades = ["1", "2", "3", "4", "5", "6"]
 
+# Helper function to evaluate passing thresholds
+# Index comparison works because the grades are ordered from best to worst
+def check_g3_at_least(grade, target):
+    if grade not in g3_grades: return False
+    return g3_grades.index(grade) <= g3_grades.index(target)
+
+def check_g2_at_least(grade, target_str):
+    if grade not in g2_grades: return False
+    return int(grade) <= int(target_str)
+
 # --- 2. STEP 1: SUBJECT ENTRY ---
 st.write("### Step 1: Select Your Subjects")
 selected_subjects = st.multiselect(
@@ -35,7 +45,6 @@ selected_subjects = st.multiselect(
     options=all_selectable_subjects
 )
 
-# Dictionaries to track final validated levels and grades
 subject_levels = {}
 subject_grades = {}
 
@@ -63,7 +72,6 @@ if selected_subjects:
             with col1:
                 st.markdown(f"**{subject}**")
                 
-            # Determine Level Selection
             with col2:
                 if subject in overlapping_subjects:
                     chosen_level = st.segmented_control(
@@ -85,7 +93,6 @@ if selected_subjects:
                     )
                     subject_levels[subject] = "G3"
             
-            # Determine Grade Selection based on chosen level
             with col3:
                 current_level = subject_levels[subject]
                 available_grades = g3_grades if current_level == "G3" else g2_grades
@@ -109,30 +116,97 @@ if selected_subjects:
     st.metric(label="Total G2 Subjects", value=g2_count)
     st.metric(label="Total Combined (G2 + G3) Subjects", value=total_g2_g3_count)
     
-    # Pathway status tracking
     pathways = {
-        "Junior College": {"open": False, "reason": ""},
-        "Polytechnic Year 1": {"open": False, "reason": ""},
-        "Polytechnic Foundation Programme": {"open": False, "reason": ""}
+        "Junior College": {"open": False, "reason": []},
+        "Polytechnic Year 1": {"open": False, "reason": []},
+        "Polytechnic Foundation Programme": {"open": False, "reason": []}
     }
     
-    # 1. Junior College Logic: At least 5 subjects at G3 level
-    if g3_count >= 5:
+    # --- JUNIOR COLLEGE SPECIFIC COMPLEX LOGIC ---
+    jc_passed_rules = True
+    jc_reasons = []
+
+    # 1. Total G3 subjects condition
+    if g3_count < 5:
+        jc_passed_rules = False
+        jc_reasons.append(f"Requires at least 5 G3 subjects (You have {g3_count}).")
+
+    # 2. English requirement (G3 level, at least C6)
+    if "English Language" in subject_levels:
+        el_lvl = subject_levels["English Language"]
+        el_grade = subject_grades["English Language"]
+        if el_lvl != "G3" or not check_g3_at_least(el_grade, "C6"):
+            jc_passed_rules = False
+            jc_reasons.append(f"English Language must be at least G3 C6 (Current: {el_lvl} {el_grade}).")
+    else:
+        jc_passed_rules = False
+        jc_reasons.append("English Language is missing from selected subjects.")
+
+    # 3. Math requirement (Mathematics or Additional Mathematics at G3 level, at least D7)
+    math_valid = False
+    math_details = []
+    for math_sub in ["Mathematics", "Additional Mathematics"]:
+        if math_sub in subject_levels:
+            m_lvl = subject_levels[math_sub]
+            m_grade = subject_grades[math_sub]
+            if m_lvl == "G3" and check_g3_at_least(m_grade, "D7"):
+                math_valid = True
+            math_details.append(f"{math_sub} ({m_lvl} {m_grade})")
+    
+    if not math_valid:
+        jc_passed_rules = False
+        jc_reasons.append(f"Requires Mathematics or Add Mathematics at G3 D7 or better (Current: {', '.join(math_details) if math_details else 'None selected'}).")
+
+    # 4. Mother Tongue requirement (G3 D7 or G2 Grade 5) OR Higher Mother Tongue (G3 E8)
+    mt_subjects = ["Chinese Language", "Malay Language", "Tamil Language", "Bengali", "Gujarati", "Hindi", "Panjabi", "Urdu"]
+    hmt_subjects = ["Higher Chinese", "Higher Malay", "Higher Tamil"]
+    
+    mt_valid = False
+    mt_details = []
+    
+    # Check HMT first
+    for hmt in hmt_subjects:
+        if hmt in subject_levels:
+            h_lvl = subject_levels[hmt]
+            h_grade = subject_grades[hmt]
+            if h_lvl == "G3" and check_g3_at_least(h_grade, "E8"):
+                mt_valid = True
+            mt_details.append(f"{hmt} ({h_lvl} {h_grade})")
+
+    # Check normal MT if HMT isn't tracking as valid yet
+    if not mt_valid:
+        for mt in mt_subjects:
+            if mt in subject_levels:
+                lvl = subject_levels[mt]
+                grade = subject_grades[mt]
+                if lvl == "G3" and check_g3_at_least(grade, "D7"):
+                    mt_valid = True
+                elif lvl == "G2" and check_g2_at_least(grade, "5"):
+                    mt_valid = True
+                mt_details.append(f"{mt} ({lvl} {grade})")
+
+    if not mt_valid:
+        jc_passed_rules = False
+        jc_reasons.append(f"Requires Mother Tongue at G3 D7/G2 5 or Higher Mother Tongue at G3 E8 (Current: {', '.join(mt_details) if mt_details else 'None selected'}).")
+
+    # Save JC overall status
+    if jc_passed_rules:
         pathways["Junior College"]["open"] = True
     else:
-        pathways["Junior College"]["reason"] = f"Requires at least 5 G3 subjects (You have {g3_count})."
+        pathways["Junior College"]["reason"] = jc_reasons
 
-    # 2. Polytechnic Year 1 Logic: At least 4 subjects at G3 level
+    # --- OTHER PATHWAYS RE-EVALUATION ---
+    # 2. Polytechnic Year 1 Logic
     if g3_count >= 4:
         pathways["Polytechnic Year 1"]["open"] = True
     else:
-        pathways["Polytechnic Year 1"]["reason"] = f"Requires at least 4 G3 subjects (You have {g3_count})."
+        pathways["Polytechnic Year 1"]["reason"] = [f"Requires at least 4 G3 subjects (You have {g3_count})."]
 
-    # 3. Polytechnic Foundation Programme Logic: At least 5 subjects at G2 or G3 level
+    # 3. Polytechnic Foundation Programme Logic
     if total_g2_g3_count >= 5:
         pathways["Polytechnic Foundation Programme"]["open"] = True
     else:
-        pathways["Polytechnic Foundation Programme"]["reason"] = f"Requires at least 5 subjects combined at G2 or G3 level (You have {total_g2_g3_count})."
+        pathways["Polytechnic Foundation Programme"]["reason"] = [f"Requires at least 5 subjects combined at G2 or G3 level (You have {total_g2_g3_count})."]
 
     # --- 5. DISPLAY PATHWAY STATUSES ---
     st.write("### Pathway Eligibility Status")
@@ -141,6 +215,7 @@ if selected_subjects:
         if info["open"]:
             st.success(f"✅ **{name}** is **Available**")
         else:
-            st.error(f"❌ **{name}** is **Not Available** \n*Reason: {info['reason']}*")
+            reasons_list = "\n".join([f"- {r}" for r in info["reason"]])
+            st.error(f"❌ **{name}** is **Not Available** \n\n*Requirements Not Met:*\n{reasons_list}")
 else:
     st.info("Please choose your subjects above to calculate your eligibility.")
