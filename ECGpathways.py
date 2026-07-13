@@ -58,7 +58,6 @@ if selected_subjects:
 
     for subject in selected_subjects:
         with st.container():
-            # col1 for Subject Name, col2 for Level buttons, col3 for Grade Dropdown
             col1, col2, col3 = st.columns([2, 1.2, 1], vertical_alignment="center")
             
             with col1:
@@ -104,9 +103,11 @@ if selected_subjects:
     
     g3_count = sum(1 for lvl in subject_levels.values() if lvl == "G3")
     g2_count = sum(1 for lvl in subject_levels.values() if lvl == "G2")
+    total_g2_g3_count = g3_count + g2_count
     
     st.metric(label="Total G3 Subjects", value=g3_count)
     st.metric(label="Total G2 Subjects", value=g2_count)
+    st.metric(label="Total Combined (G2 + G3) Subjects", value=total_g2_g3_count)
     
     # Pathway status tracking
     pathways = {
@@ -115,26 +116,23 @@ if selected_subjects:
         "Polytechnic Foundation Programme": {"open": False, "reason": ""}
     }
     
-    # 1. Junior College Logic
+    # 1. Junior College Logic: At least 5 subjects at G3 level
     if g3_count >= 5:
         pathways["Junior College"]["open"] = True
     else:
         pathways["Junior College"]["reason"] = f"Requires at least 5 G3 subjects (You have {g3_count})."
 
-    # 2. Polytechnic Year 1 Logic
-    if g3_count >= 5 or (g3_count == 4 and g2_count >= 1):
+    # 2. Polytechnic Year 1 Logic: At least 4 subjects at G3 level
+    if g3_count >= 4:
         pathways["Polytechnic Year 1"]["open"] = True
     else:
-        if g3_count == 4:
-            pathways["Polytechnic Year 1"]["reason"] = f"You have 4 G3 subjects, but require at least 1 G2 subject (You have {g2_count})."
-        else:
-            pathways["Polytechnic Year 1"]["reason"] = f"Requires 5+ G3 subjects, OR exactly 4 G3 subjects with at least 1 G2 subject (You have {g3_count} G3)."
+        pathways["Polytechnic Year 1"]["reason"] = f"Requires at least 4 G3 subjects (You have {g3_count})."
 
-    # 3. Polytechnic Foundation Programme Logic
-    if g3_count >= 5 or (g3_count == 4 and g2_count >= 1) or (g3_count <= 3 and g2_count >= 5):
+    # 3. Polytechnic Foundation Programme Logic: At least 5 subjects at G2 or G3 level
+    if total_g2_g3_count >= 5:
         pathways["Polytechnic Foundation Programme"]["open"] = True
     else:
-        pathways["Polytechnic Foundation Programme"]["reason"] = f"Requires at least 5 G2 subjects when taking 3 or fewer G3 subjects (You have {g3_count} G3 and {g2_count} G2)."
+        pathways["Polytechnic Foundation Programme"]["reason"] = f"Requires at least 5 subjects combined at G2 or G3 level (You have {total_g2_g3_count})."
 
     # --- 5. DISPLAY PATHWAY STATUSES ---
     st.write("### Pathway Eligibility Status")
