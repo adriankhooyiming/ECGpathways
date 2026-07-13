@@ -28,8 +28,7 @@ all_selectable_subjects = sorted(g3_only_subjects + overlapping_subjects)
 g3_grades = ["A1", "A2", "B3", "B4", "C5", "C6", "D7", "E8", "9"]
 g2_grades = ["1", "2", "3", "4", "5", "6"]
 
-# Helper function to evaluate passing thresholds
-# Index comparison works because the grades are ordered from best to worst
+# Helper functions to check passing thresholds
 def check_g3_at_least(grade, target):
     if grade not in g3_grades: return False
     return g3_grades.index(grade) <= g3_grades.index(target)
@@ -122,74 +121,102 @@ if selected_subjects:
         "Polytechnic Foundation Programme": {"open": False, "reason": []}
     }
     
-    # --- JUNIOR COLLEGE SPECIFIC COMPLEX LOGIC ---
+    # --- JUNIOR COLLEGE LOGIC WITH DETAILED CUSTOM ERROR FORMATTING ---
     jc_passed_rules = True
     jc_reasons = []
 
-    # 1. Total G3 subjects condition
+    # 1. Subject Count Check
     if g3_count < 5:
         jc_passed_rules = False
         jc_reasons.append(f"Requires at least 5 G3 subjects (You have {g3_count}).")
 
-    # 2. English requirement (G3 level, at least C6)
+    # 2. English Language Check
     if "English Language" in subject_levels:
         el_lvl = subject_levels["English Language"]
         el_grade = subject_grades["English Language"]
-        if el_lvl != "G3" or not check_g3_at_least(el_grade, "C6"):
+        if el_lvl == "G3":
+            if not check_g3_at_least(el_grade, "C6"):
+                jc_passed_rules = False
+                jc_reasons.append(f"English Language at the G3 level should have a minimum grade of C6.")
+        else:
             jc_passed_rules = False
-            jc_reasons.append(f"English Language must be at least G3 C6 (Current: {el_lvl} {el_grade}).")
+            jc_reasons.append(f"English Language at the G2 level should have a minimum grade of C6 at the G3 level instead.")
     else:
         jc_passed_rules = False
         jc_reasons.append("English Language is missing from selected subjects.")
 
-    # 3. Math requirement (Mathematics or Additional Mathematics at G3 level, at least D7)
-    math_valid = False
-    math_details = []
+    # 3. Mathematics / Additional Mathematics Check
+    has_math_selected = False
+    math_failures = []
+    
     for math_sub in ["Mathematics", "Additional Mathematics"]:
         if math_sub in subject_levels:
+            has_math_selected = True
             m_lvl = subject_levels[math_sub]
             m_grade = subject_grades[math_sub]
+            
             if m_lvl == "G3" and check_g3_at_least(m_grade, "D7"):
-                math_valid = True
-            math_details.append(f"{math_sub} ({m_lvl} {m_grade})")
-    
-    if not math_valid:
+                # If even one math matches the G3 D7 rule, the entire math block passes
+                break
+            else:
+                if m_lvl == "G3":
+                    math_failures.append(f"{math_sub} at the G3 level should have a minimum grade of D7.")
+                else:
+                    math_failures.append(f"{math_sub} at the G2 level should have a minimum grade of D7 at the G3 level.")
+    else:
+        # Executes only if the loop finishes without hitting the passing 'break'
         jc_passed_rules = False
-        jc_reasons.append(f"Requires Mathematics or Add Mathematics at G3 D7 or better (Current: {', '.join(math_details) if math_details else 'None selected'}).")
+        if not has_math_selected:
+            jc_reasons.append("Mathematics or Additional Mathematics must be selected.")
+        else:
+            jc_reasons.extend(math_failures)
 
-    # 4. Mother Tongue requirement (G3 D7 or G2 Grade 5) OR Higher Mother Tongue (G3 E8)
+    # 4. Mother Tongue / Higher Mother Tongue Check
     mt_subjects = ["Chinese Language", "Malay Language", "Tamil Language", "Bengali", "Gujarati", "Hindi", "Panjabi", "Urdu"]
     hmt_subjects = ["Higher Chinese", "Higher Malay", "Higher Tamil"]
     
-    mt_valid = False
-    mt_details = []
-    
-    # Check HMT first
+    has_mt_selected = False
+    mt_passed = False
+    mt_failures = []
+
+    # Verify HMT First
     for hmt in hmt_subjects:
         if hmt in subject_levels:
+            has_mt_selected = True
             h_lvl = subject_levels[hmt]
             h_grade = subject_grades[hmt]
             if h_lvl == "G3" and check_g3_at_least(h_grade, "E8"):
-                mt_valid = True
-            mt_details.append(f"{hmt} ({h_lvl} {h_grade})")
+                mt_passed = True
+                break
+            else:
+                mt_failures.append(f"{hmt} at the G3 level should have a minimum grade of E8.")
 
-    # Check normal MT if HMT isn't tracking as valid yet
-    if not mt_valid:
+    # Verify normal MT if HMT failed or wasn't taken
+    if not mt_passed:
         for mt in mt_subjects:
             if mt in subject_levels:
+                has_mt_selected = True
                 lvl = subject_levels[mt]
                 grade = subject_grades[mt]
+                
                 if lvl == "G3" and check_g3_at_least(grade, "D7"):
-                    mt_valid = True
+                    mt_passed = True
+                    break
                 elif lvl == "G2" and check_g2_at_least(grade, "5"):
-                    mt_valid = True
-                mt_details.append(f"{mt} ({lvl} {grade})")
+                    mt_passed = True
+                    break
+                else:
+                    req_grade = "D7" if lvl == "G3" else "5"
+                    mt_failures.append(f"{mt} at the {lvl} level should have a minimum grade of {req_grade}.")
 
-    if not mt_valid:
+    if not mt_passed:
         jc_passed_rules = False
-        jc_reasons.append(f"Requires Mother Tongue at G3 D7/G2 5 or Higher Mother Tongue at G3 E8 (Current: {', '.join(mt_details) if mt_details else 'None selected'}).")
+        if not has_mt_selected:
+            jc_reasons.append("A Mother Tongue or Higher Mother Tongue subject must be selected.")
+        else:
+            jc_reasons.extend(mt_failures)
 
-    # Save JC overall status
+    # Update dynamic status object
     if jc_passed_rules:
         pathways["Junior College"]["open"] = True
     else:
