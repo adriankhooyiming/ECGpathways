@@ -1,6 +1,7 @@
 import streamlit as st
 
-st.title("SEC 2027 Pathway Eligibility Checker")
+st.title("SEC Pathway Eligibility Checker")
+st.write("For any feedback or questions, please email to adrian_khoo_yi_ming@moe.edu.sg")
 
 # --- 1. DEFINE SYLLABUS CATEGORIES (Based on MOE Guidelines) ---
 humanities_subjects = [
