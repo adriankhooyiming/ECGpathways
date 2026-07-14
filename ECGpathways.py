@@ -285,7 +285,7 @@ if selected_subjects:
             else:
                 st.metric(label="Your Gross L1R4 Score", value=l1_r4_gross)
                 
-        # --- PATHWAY B: POLYTECHNIC YEAR 1 ---
+        # --- PATHWAY B: POLYTECHNIC YEAR 1 (Detailed Validation & 22-Point Cap Check) ---
         elif chosen_pathway == "Polytechnic Year 1":
             st.success("🚀 You are exploring the **Polytechnic Year 1** pathway option.")
             
@@ -335,15 +335,15 @@ if selected_subjects:
                 # 1. Evaluate R1
                 r1_eligible = {s: v for s, v in pool_g3.items() if s in g1_subjects}
                 if not r1_eligible:
-                    if g3_count == 4:
-                        upgradeable_for_r1 = [s for s in selected_subjects if s in g1_subjects and subject_levels.get(s) == "G2"]
-                        if upgradeable_for_r1:
-                            subjects_str = ", ".join([f"**{s}**" for s in upgradeable_for_r1])
-                            unmet_reasons.append(f"Missing an eligible G3 subject for **R1**. Based on your selected subjects, you need to change the level of {subjects_str} from G2 to **G3**.")
-                        else:
-                            unmet_reasons.append("Missing an eligible G3 subject from the **1st Group of Relevant Subjects (R1)**.")
-                    else:
-                        unmet_reasons.append("Missing an eligible G3 subject from the **1st Group of Relevant Subjects (R1)**.")
+                    unmet_reasons.append(f"Missing an eligible G3 subject from the **1st Group of Relevant Subjects (R1)** required for {elr2b2_type.split(' ')[0]}.")
+                    # Specify offered subjects that failed the requirement
+                    offered_r1_candidates = [s for s in selected_subjects if s in g1_subjects]
+                    if offered_r1_candidates:
+                        unmet_reasons.append("The following candidate subjects were offered but failed because they are not at G3 level or lack a valid grade:")
+                        for s in offered_r1_candidates:
+                            lvl = subject_levels[s]
+                            grd = subject_grades[s]
+                            unmet_reasons.append(f"  * **{s}** (taken at **{lvl}** level with grade **{grd}**)")
                 else:
                     r1_sub = min(r1_eligible, key=r1_eligible.get)
                     r1_score = pool_g3.pop(r1_sub)
@@ -351,15 +351,15 @@ if selected_subjects:
                 # 2. Evaluate R2
                 r2_eligible = {s: v for s, v in pool_g3.items() if s in g2_subjects}
                 if not r2_eligible:
-                    if g3_count == 4:
-                        upgradeable_for_r2 = [s for s in selected_subjects if s in g2_subjects and subject_levels.get(s) == "G2"]
-                        if upgradeable_for_r2:
-                            subjects_str = ", ".join([f"**{s}**" for s in upgradeable_for_r2])
-                            unmet_reasons.append(f"Missing an eligible G3 subject for **R2**. Based on your selected subjects, you need to change the level of {subjects_str} from G2 to **G3**.")
-                        else:
-                            unmet_reasons.append("Missing an eligible G3 subject from the **2nd Group of Relevant Subjects (R2)**.")
-                    else:
-                        unmet_reasons.append("Missing an eligible G3 subject from the **2nd Group of Relevant Subjects (R2)**.")
+                    unmet_reasons.append(f"Missing an eligible G3 subject from the **2nd Group of Relevant Subjects (R2)** required for {elr2b2_type.split(' ')[0]}.")
+                    # Specify offered subjects that failed the requirement
+                    offered_r2_candidates = [s for s in selected_subjects if s in g2_subjects]
+                    if offered_r2_candidates:
+                        unmet_reasons.append("The following candidate subjects were offered but failed because they are not at G3 level or lack a valid grade:")
+                        for s in offered_r2_candidates:
+                            lvl = subject_levels[s]
+                            grd = subject_grades[s]
+                            unmet_reasons.append(f"  * **{s}** (taken at **{lvl}** level with grade **{grd}**)")
                 else:
                     r2_sub = min(r2_eligible, key=r2_eligible.get)
                     r2_score = pool_g3.pop(r2_sub)
@@ -389,7 +389,13 @@ if selected_subjects:
                             b2_source_is_g2 = False
                     elif g3_count == 4:
                         if len(pool_g2) < 1:
-                            unmet_reasons.append("For students offering exactly 4 G3 subjects, you must provide at least 1 eligible G2 subject for **Best 2 (B2)**.")
+                            unmet_reasons.append("For students offering exactly 4 G3 subjects, you must provide at least 1 eligible G2 subject (Grade 1-4) for **Best 2 (B2)**.")
+                            # Specify offered G2 subjects that failed
+                            offered_g2_candidates = [s for s in selected_subjects if subject_levels[s] == "G2"]
+                            if offered_g2_candidates:
+                                unmet_reasons.append("The following G2 subjects were offered but their grades do not meet the minimum criteria (Grade 1-4):")
+                                for s in offered_g2_candidates:
+                                    unmet_reasons.append(f"  * **{s}** (Grade: **{subject_grades[s]}**)")
                         else:
                             b2_sub = min(pool_g2, key=pool_g2.get)
                             b2_score = pool_g2[b2_sub]  
@@ -399,7 +405,7 @@ if selected_subjects:
                 if unmet_reasons:
                     st.error("❌ **Cannot Calculate ELR2B2 Score due to unmet criteria:**")
                     for reason in unmet_reasons:
-                        st.markdown(f"* {reason}")
+                        st.markdown(f"{reason}")
                 else:
                     col1, col2 = st.columns(2)
                     with col1:
@@ -409,7 +415,14 @@ if selected_subjects:
                         st.info(f"**Best Subjects Pool:**\n* **B1 (G3 Raw):** {b1_sub} → **{b1_score}**\n* {b2_label}")
                     
                     elr2b2_gross = el_score + r1_score + r2_score + b1_score + b2_score
-                    st.metric(label="Calculated Gross ELR2B2 Score", value=elr2b2_gross)
+                    
+                    # --- ADDED: 22-POINT CRITERIA VALIDATION ---
+                    if elr2b2_gross <= 22:
+                        st.metric(label="Calculated Gross ELR2B2 Score", value=elr2b2_gross)
+                        st.success("🎉 Your score meets the Polytechnic baseline entry requirement of ≤ 22 points!")
+                    else:
+                        st.metric(label="Calculated Gross ELR2B2 Score", value=elr2b2_gross)
+                        st.error(f"❌ Gross aggregate score is {elr2b2_gross}, which exceeds the maximum allowable Polytechnic admission limit of 22. You are not eligible for this pathway.")
 
         # --- PATHWAY C: POLYTECHNIC FOUNDATION PROGRAMME (PFP ELMAB3 Detailed Validation) ---
         elif chosen_pathway == "Polytechnic Foundation Programme":
