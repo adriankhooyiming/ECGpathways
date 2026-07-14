@@ -3,14 +3,14 @@ import streamlit as st
 st.title("SEC 2027 Pathway Eligibility Checker")
 
 # --- 1. DEFINE SYLLABUS CATEGORIES (For L1R4 & ELR2B2 structural filtering) ---
+# Removed 'Literature in Tamil' and 'Humanities (Social Studies, Literature in Tamil)'
 humanities_subjects = [
     "Literature in English", "History", "Geography", 
     "Humanities (Social Studies, Geography)", "Humanities (Social Studies, History)", 
     "Humanities (Social Studies, Literature in English)", "Economics", "Drama",
-    "Literature in Chinese", "Literature in Malay", "Literature in Tamil",
+    "Literature in Chinese", "Literature in Malay",
     "Humanities (Social Studies, Literature in Chinese)", 
-    "Humanities (Social Studies, Literature in Malay)", 
-    "Humanities (Social Studies, Literature in Tamil)"
+    "Humanities (Social Studies, Literature in Malay)"
 ]
 
 math_science_subjects = [
@@ -22,13 +22,14 @@ math_science_subjects = [
 mt_subjects = ["Chinese Language", "Malay Language", "Tamil Language", "Bengali", "Gujarati", "Hindi", "Panjabi", "Urdu"]
 hmt_subjects = ["Higher Chinese", "Higher Malay", "Higher Tamil"]
 
+# Removed 'Literature in Tamil' from G3-only list
 g3_only_subjects = [
     "Arabic as a 3rd Language", "Bahasa Indonesia as a 3rd Language", "Economics", 
     "Drama", "Spanish", "French", "German", "Japanese", "Physics", "Chemistry", 
     "Biology", "Electronics", "Music", "Higher Music", "Higher Art", "Biotechnology", 
     "Design Studies", "Higher Chinese", "Chinese (Special Programme)", "Literature in Chinese",
     "Higher Malay", "Malay (Special Programme)", "Literature in Malay", "Higher Tamil", 
-    "Literature in Tamil", "Exercise And Sports Science", "Business"
+    "Exercise And Sports Science", "Business"
 ]
 
 overlapping_subjects = [
@@ -36,7 +37,6 @@ overlapping_subjects = [
     "History", "Geography", "Humanities (Social Studies, Geography)", 
     "Humanities (Social Studies, History)", "Humanities (Social Studies, Literature in English)", 
     "Humanities (Social Studies, Literature in Malay)", "Humanities (Social Studies, Literature in Chinese)",
-    "Humanities (Social Studies, Literature in Tamil)",
     "Computing", "Science (Physics, Chemistry)", "Science (Physics, Biology)", 
     "Science (Chemistry, Biology)", "Nutrition and Food Science", "Art", 
     "Design & Technology", "Principles of Accounts"
@@ -288,9 +288,15 @@ if selected_subjects:
         elif chosen_pathway == "Polytechnic Year 1":
             st.success("🚀 You are exploring the **Polytechnic Year 1** pathway option.")
             
+            # Updated to exact phrasing requested
             elr2b2_type = st.selectbox(
                 "Select your target course cluster (ELR2B2 Type):",
-                options=["ELR2B2-A (Humanities/Business)", "ELR2B2-B (Science/Math-heavy Business)", "ELR2B2-C (Engineering/Science)", "ELR2B2-D (Design/Media)"]
+                options=[
+                    "ELR2B2-A (Arts & Humanities)", 
+                    "ELR2B2-B (Business)", 
+                    "ELR2B2-C (ICT & Engineering)", 
+                    "ELR2B2-D (Design & Media)"
+                ]
             )
             
             g3_subs = {sub: grade for sub, grade in subject_grades.items() if subject_levels[sub] == "G3"}
