@@ -2,7 +2,26 @@ import streamlit as st
 
 st.title("SEC 2027 Pathway Eligibility Checker")
 
-# --- 1. DEFINE SYLLABUS LISTS ---
+# --- 1. DEFINE SYLLABUS CATEGORIES (For L1R4 structural filtering) ---
+humanities_subjects = [
+    "Literature in English", "History", "Geography", 
+    "Humanities (Social Studies, Geography)", "Humanities (Social Studies, History)", 
+    "Humanities (Social Studies, Literature in English)", "Economics", "Drama",
+    "Literature in Chinese", "Literature in Malay", "Literature in Tamil",
+    "Humanities (Social Studies, Literature in Chinese)", 
+    "Humanities (Social Studies, Literature in Malay)", 
+    "Humanities (Social Studies, Literature in Tamil)"
+]
+
+math_science_subjects = [
+    "Mathematics", "Additional Mathematics", "Computing", "Physics", "Chemistry", 
+    "Biology", "Electronics", "Science (Physics, Chemistry)", 
+    "Science (Physics, Biology)", "Science (Chemistry, Biology)", "Biotechnology"
+]
+
+mt_subjects = ["Chinese Language", "Malay Language", "Tamil Language", "Bengali", "Gujarati", "Hindi", "Panjabi", "Urdu"]
+hmt_subjects = ["Higher Chinese", "Higher Malay", "Higher Tamil"]
+
 g3_only_subjects = [
     "Arabic as a 3rd Language", "Bahasa Indonesia as a 3rd Language", "Economics", 
     "Drama", "Spanish", "French", "German", "Japanese", "Physics", "Chemistry", 
@@ -18,17 +37,16 @@ overlapping_subjects = [
     "Humanities (Social Studies, History)", "Humanities (Social Studies, Literature in English)", 
     "Computing", "Science (Physics, Chemistry)", "Science (Physics, Biology)", 
     "Science (Chemistry, Biology)", "Nutrition and Food Science", "Art", 
-    "Design & Technology", "Principles of Accounts", "Chinese Language", 
-    "Malay Language", "Tamil Language", "Bengali", "Gujarati", "Hindi", "Panjabi", "Urdu"
-]
+    "Design & Technology", "Principles of Accounts"
+] + mt_subjects
 
-all_selectable_subjects = sorted(g3_only_subjects + overlapping_subjects)
+all_selectable_subjects = sorted(list(set(g3_only_subjects + overlapping_subjects)))
 
-# Grade scale definitions
+# Grade score mapping to integer points
 g3_grades = ["A1", "A2", "B3", "B4", "C5", "C6", "D7", "E8", "9"]
+g3_points = {"A1": 1, "A2": 2, "B3": 3, "B4": 4, "C5": 5, "C6": 6, "D7": 7, "E8": 8, "9": 9}
 g2_grades = ["1", "2", "3", "4", "5", "6"]
 
-# Helper functions to check passing thresholds
 def check_g3_at_least(grade, target):
     if grade not in g3_grades: return False
     return g3_grades.index(grade) <= g3_grades.index(target)
@@ -52,18 +70,6 @@ if selected_subjects:
     st.write("---")
     st.write("### Step 2: Assign Subject Levels and Grades")
     
-    st.markdown("""
-        <style>
-        .subject-row {
-            padding: 12px 20px;
-            border: 1px solid #e6e9ef;
-            border-radius: 12px;
-            margin-bottom: 10px;
-            background-color: #ffffff;
-        }
-        </style>
-    """, unsafe_allow_html=True)
-
     for subject in selected_subjects:
         with st.container():
             col1, col2, col3 = st.columns([2, 1.2, 1], vertical_alignment="center")
@@ -115,7 +121,7 @@ if selected_subjects:
         "Polytechnic Foundation Programme": {"open": False, "reason": []}
     }
     
-    # --- JUNIOR COLLEGE LOGIC ---
+    # --- JUNIOR COLLEGE ELIGIBILITY CHECK ---
     jc_passed_rules = True
     jc_reasons = []
 
@@ -152,8 +158,6 @@ if selected_subjects:
             jc_passed_rules = False
             jc_reasons.extend(math_failures)
 
-    mt_subjects = ["Chinese Language", "Malay Language", "Tamil Language", "Bengali", "Gujarati", "Hindi", "Panjabi", "Urdu"]
-    hmt_subjects = ["Higher Chinese", "Higher Malay", "Higher Tamil"]
     has_mt_selected = False
     mt_passed = False
     mt_failures = []
@@ -193,42 +197,96 @@ if selected_subjects:
     if jc_passed_rules: pathways["Junior College"]["open"] = True
     else: pathways["Junior College"]["reason"] = jc_reasons
 
-    # --- POLYTECHNIC YEAR 1 LOGIC ---
+    # Other pathways rules
     if g3_count >= 4: pathways["Polytechnic Year 1"]["open"] = True
-    else: pathways["Polytechnic Year 1"]["reason"] = [f"Requires at least 4 G3 subjects (You have {g3_count})."]
-
-    # --- PFP LOGIC ---
     if total_g2_g3_count >= 5: pathways["Polytechnic Foundation Programme"]["open"] = True
-    else: pathways["Polytechnic Foundation Programme"]["reason"] = [f"Requires at least 5 subjects combined at G2 or G3 level (You have {total_g2_g3_count})."]
 
-    # Build list of strictly eligible pathways
     eligible_options = [name for name, info in pathways.items() if info["open"]]
 
-    # --- 5. STEP 3: PATHWAY BUTTON SELECTION ---
+    # --- 5. STEP 3: PATHWAY BUTTON SELECTION & L1R4 CALCULATION ---
     st.write("---")
     st.write("### Step 3: Select an Eligible Pathway to Explore")
     
     if eligible_options:
-        # Renders interactive buttons for available pathways only
         chosen_pathway = st.segmented_control(
             label="Select a pathway you are interested in learning:",
             options=eligible_options,
             key="selected_exploration_pathway"
         )
         
-        if chosen_pathway:
-            st.success(f"You have selected **{chosen_pathway}**. (Logic for exploring this pathway can go here!)")
-    else:
-        st.warning("You do not currently qualify for any pathways based on these grades.")
+        if chosen_pathway == "Junior College":
+            st.success("🎉 You are exploring the **Junior College / Millennia Institute** pathway option.")
+            
+            # --- L1R4 CALCULATION ALGORITHM (STRICTLY G3 ONLY) ---
+            # Create a score dictionary containing ONLY G3 level subjects
+            g3_scores = {
+                sub: g3_points[grade] 
+                for sub, grade in subject_grades.items() 
+                if subject_levels[sub] == "G3"
+            }
 
-    # --- 6. OPTIONAL ELIGIBILITY FEEDBACK LOGS ---
-    with st.expander("View Full Requirements Breakdown"):
-        for name, info in pathways.items():
-            if info["open"]:
-                st.write(f"✅ **{name}**: Available")
+            # A. Select L1 (English or HMT) from G3 pool
+            l1_candidates = {}
+            if "English Language" in g3_scores:
+                l1_candidates["English Language"] = g3_scores["English Language"]
+            for hmt in hmt_subjects:
+                if hmt in g3_scores:
+                    l1_candidates[hmt] = g3_scores[hmt]
+            
+            if l1_candidates:
+                l1_sub = min(l1_candidates, key=l1_candidates.get)
+                l1_score = l1_candidates[l1_sub]
             else:
-                st.write(f"❌ **{name}**: Not Available")
-                for r in info["reason"]:
-                    st.write(f"  - {r}")
+                l1_sub = "None Available"
+                l1_score = 0
+            
+            # B. Prepare remaining G3 subjects for relevant pools (Exclude selected L1)
+            remaining_pool = {sub: score for sub, score in g3_scores.items() if sub != l1_sub}
+            
+            # Exclusion logic: If L1 is HMT, cannot use normal MT in the R calculations
+            if l1_sub in hmt_subjects:
+                remaining_pool = {sub: score for sub, score in remaining_pool.items() if sub not in mt_subjects}
+
+            # C. Extract R1 and R2 (Best 2 G3 subjects from Humanities, Math, or Science)
+            r1_r2_pool = {sub: score for sub, score in remaining_pool.items() if sub in humanities_subjects or sub in math_science_subjects}
+            sorted_r1_r2 = sorted(r1_r2_pool.items(), key=lambda x: x[1])
+            
+            r_subjects_chosen = []
+            r_score_total = 0
+            
+            # Take up to 2 for R1/R2
+            for sub, score in sorted_r1_r2[:2]:
+                r_subjects_chosen.append((sub, score))
+                r_score_total += score
+                remaining_pool.pop(sub) # Consume from the master G3 stack
+
+            # D. Extract R3 and R4 (Best 2 remaining overall G3 subjects)
+            sorted_r3_r4 = sorted(remaining_pool.items(), key=lambda x: x[1])
+            for sub, score in sorted_r3_r4[:2]:
+                r_subjects_chosen.append((sub, score))
+                r_score_total += score
+
+            # E. Compute Final Sum
+            l1r4_gross = l1_score + r_score_total
+            
+            # --- DISPLAY SUMMARY CARD ---
+            st.markdown("### 📊 Your MOE L1R4 Aggregate Breakdown (G3 Subjects Only)")
+            
+            col_l1, col_r = st.columns(2)
+            with col_l1:
+                st.info(f"**L1 Subject (G3):**\n* {l1_sub} → **Grade {l1_score}**")
+            with col_r:
+                st.info(f"**Relevant R1–R4 Subjects (G3):**\n" + "\n".join([f"* {s} → **Grade {sc}**" for s, sc in r_subjects_chosen]))
+            
+            # Warn if there are fewer than 5 eligible G3 subjects to calculate a complete L1R4
+            if len(r_subjects_chosen) < 4 or l1_score == 0:
+                st.warning(f"⚠️ **Note:** You only have {len(r_subjects_chosen) + (1 if l1_score > 0 else 0)} eligible G3 subjects. A complete L1R4 calculation requires at least 5 G3 level subjects.")
+            else:
+                st.metric(label="Your Gross L1R4 Score", value=l1r4_gross)
+                
+        elif chosen_pathway:
+            st.info(f"You have selected **{chosen_pathway}**. L1R4 calculations apply strictly to JC/MI criteria tracks.")
+    else:
+        st.warning("You do not currently qualify for any educational pathways based on these grades.")
 else:
     st.info("Please choose your subjects above to calculate your eligibility.")
