@@ -288,28 +288,86 @@ if selected_subjects:
         elif chosen_pathway == "Polytechnic Year 1":
             st.success("🚀 You are exploring the **Polytechnic Year 1** pathway option.")
             
-            # Sub-step Selection for the specific ELR2B2 Aggregate Type
             elr2b2_type = st.selectbox(
                 "Select your target course cluster (ELR2B2 Type):",
                 options=["ELR2B2-A (Humanities/Business)", "ELR2B2-B (Science/Math-heavy Business)", "ELR2B2-C (Engineering/Science)", "ELR2B2-D (Design/Media)"]
             )
             
-            # Filter strictly down to current operational G3 entries
             g3_subs = {sub: grade for sub, grade in subject_grades.items() if subject_levels[sub] == "G3"}
             
             if "English Language" not in g3_subs:
                 st.error("❌ English Language must be taken at G3 level to compute an ELR2B2 score.")
             else:
                 el_score = g3_points[g3_subs["English Language"]]
-                
-                # Setup master pool excluding English
-                pool = {s: g3_points[g] for s, g in g3_subs.items() if s != "English Language" and g != "9"}
+                pool = {s: v for s, v in g3_points.items() if s in g3_subs and s != "English Language" and g3_subs[s] != "9"}
                 
                 r1_pool = {}
                 r2_pool = {}
                 
-                # --- APPLY MOE STRUCTURAL FILTERS PER AGGREGATE TYPE ---
                 if "ELR2B2-A" in elr2b2_type:
-                    # R1: Best from Humanities Group
                     r1_pool = {s: v for s, v in pool.items() if s in humanities_subjects or s in ["Art", "Business", "Economics"]}
-                elif "ELR
+                elif "ELR2B2-B" in elr2b2_type:
+                    r1_pool = {s: v for s, v in pool.items() if s in ["Mathematics", "Additional Mathematics"]}
+                    r2_pool = {s: v for s, v in pool.items() if s in humanities_subjects or s in math_science_subjects or s in ["Art", "Business", "Economics", "Principles of Accounts"]}
+                elif "ELR2B2-C" in elr2b2_type:
+                    r1_pool = {s: v for s, v in pool.items() if s in ["Mathematics", "Additional Mathematics"]}
+                    r2_pool = {s: v for s, v in pool.items() if s in math_science_subjects and s not in ["Mathematics", "Additional Mathematics"]}
+                elif "ELR2B2-D" in elr2b2_type:
+                    r1_pool = {s: v for s, v in pool.items() if s in ["Mathematics", "Additional Mathematics"]}
+                    r2_pool = {s: v for s, v in pool.items() if s in math_science_subjects or s in humanities_subjects or s in ["Art", "Design & Technology", "Nutrition and Food Science", "Principles of Accounts"]}
+
+                r1_sub, r1_score = None, 0
+                r2_sub, r2_score = None, 0
+                
+                if r1_pool:
+                    r1_sub = min(r1_pool, key=r1_pool.get)
+                    r1_score = pool.pop(r1_sub)
+                    
+                if "ELR2B2-A" in elr2b2_type:
+                    r2_eligible = {s: v for s, v in pool.items() if s in math_science_subjects or s in humanities_subjects or s in ["Principles of Accounts", "Art", "Design & Technology"]}
+                    if r2_eligible:
+                        r2_sub = min(r2_eligible, key=r2_eligible.get)
+                        r2_score = pool.pop(r2_sub)
+                else:
+                    r2_filtered = {s: v for s, v in r2_pool.items() if s in pool}
+                    if r2_filtered:
+                        r2_sub = min(r2_filtered, key=r2_filtered.get)
+                        r2_score = pool.pop(r2_sub)
+
+                hmt_used = (r1_sub in hmt_subjects) or (r2_sub in hmt_subjects)
+                if hmt_used:
+                    pool = {s: v for s, v in pool.items() if s not in mt_subjects}
+                    
+                sorted_rem = sorted(pool.items(), key=lambda x: x[1])
+                
+                b1_sub, b1_score = None, 0
+                b2_sub, b2_score = None, 0
+                
+                if len(sorted_rem) >= 1:
+                    b1_sub, b1_score = sorted_rem[0]
+                
+                if len(sorted_rem) >= 2:
+                    b2_sub, orig_g3_grade = sorted_rem[1][0], g3_subs[sorted_rem[1][0]]
+                    b2_score = map_g3_to_g2_points(orig_g3_grade)
+
+                st.markdown(f"### 📊 Your {elr2b2_type.split(' ')[0]} Breakdown")
+                
+                if not r1_sub or not r2_sub or not b1_sub or not b2_sub:
+                    st.warning("⚠️ **Calculation Partial:** Additional corresponding G3 subjects are required to generate a complete ELR2B2 score matching this group profile.")
+                else:
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.info(f"**Core Language & Relevant Subjects:**\n* **EL:** English Language → **{el_score}**\n* **R1:** {r1_sub} → **{r1_score}**\n* **R2:** {r2_sub} → **{r2_score}**")
+                    with col2:
+                        st.info(f"**Best Subjects Pool:**\n* **B1 (G3 Raw):** {b1_sub} → **{b1_score}**\n* **B2 (Mapped to G2):** {b2_sub} → **{b2_score}** *(Mapped from G3)*")
+                    
+                    elr2b2_gross = el_score + r1_score + r2_score + b1_score + b2_score
+                    st.metric(label="Calculated Gross ELR2B2 Score", value=elr2b2_gross)
+
+        # --- PATHWAY C: PFP ---
+        elif chosen_pathway:
+            st.info(f"You have selected **{chosen_pathway}**.")
+    else:
+        st.warning("You do not currently qualify for any educational pathways based on these grades.")
+else:
+    st.info("Please choose your subjects above to calculate your eligibility.")
