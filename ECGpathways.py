@@ -35,6 +35,8 @@ overlapping_subjects = [
     "English Language", "Mathematics", "Additional Mathematics", "Literature in English", 
     "History", "Geography", "Humanities (Social Studies, Geography)", 
     "Humanities (Social Studies, History)", "Humanities (Social Studies, Literature in English)", 
+    "Humanities (Social Studies, Literature in Malay)", "Humanities (Social Studies, Literature in Chinese)",
+    "Humanities (Social Studies, Literature in Tamil)",
     "Computing", "Science (Physics, Chemistry)", "Science (Physics, Biology)", 
     "Science (Chemistry, Biology)", "Nutrition and Food Science", "Art", 
     "Design & Technology", "Principles of Accounts"
@@ -218,7 +220,6 @@ if selected_subjects:
             st.success("🎉 You are exploring the **Junior College / Millennia Institute** pathway option.")
             
             # --- L1R4 CALCULATION ALGORITHM (STRICTLY G3 ONLY) ---
-            # Create a score dictionary containing ONLY G3 level subjects
             g3_scores = {
                 sub: g3_points[grade] 
                 for sub, grade in subject_grades.items() 
@@ -243,7 +244,6 @@ if selected_subjects:
             # B. Prepare remaining G3 subjects for relevant pools (Exclude selected L1)
             remaining_pool = {sub: score for sub, score in g3_scores.items() if sub != l1_sub}
             
-            # Exclusion logic: If L1 is HMT, cannot use normal MT in the R calculations
             if l1_sub in hmt_subjects:
                 remaining_pool = {sub: score for sub, score in remaining_pool.items() if sub not in mt_subjects}
 
@@ -254,11 +254,10 @@ if selected_subjects:
             r_subjects_chosen = []
             r_score_total = 0
             
-            # Take up to 2 for R1/R2
             for sub, score in sorted_r1_r2[:2]:
                 r_subjects_chosen.append((sub, score))
                 r_score_total += score
-                remaining_pool.pop(sub) # Consume from the master G3 stack
+                remaining_pool.pop(sub)
 
             # D. Extract R3 and R4 (Best 2 remaining overall G3 subjects)
             sorted_r3_r4 = sorted(remaining_pool.items(), key=lambda x: x[1])
@@ -278,7 +277,6 @@ if selected_subjects:
             with col_r:
                 st.info(f"**Relevant R1–R4 Subjects (G3):**\n" + "\n".join([f"* {s} → **Grade {sc}**" for s, sc in r_subjects_chosen]))
             
-            # Warn if there are fewer than 5 eligible G3 subjects to calculate a complete L1R4
             if len(r_subjects_chosen) < 4 or l1_score == 0:
                 st.warning(f"⚠️ **Note:** You only have {len(r_subjects_chosen) + (1 if l1_score > 0 else 0)} eligible G3 subjects. A complete L1R4 calculation requires at least 5 G3 level subjects.")
             else:
