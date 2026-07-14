@@ -221,13 +221,14 @@ if selected_subjects:
     st.write("### Step 3: Select an Eligible Pathway to Explore")
     
     if eligible_options:
-        # --- ADDED REQUESTED LINE BELOW THE INITIAL HEADER ---
-        st.write("This is based on your current subject combination. Your eligibility depends on the grade-specific requirements.")
+        # --- MODIFIED: SPLIT TO DISPLAY ON SUCCESSIVE LINES ---
+        st.write("This is based on your current subject combination.")
+        st.write("Your eligibility depends on the grade-specific requirements.")
         
         chosen_pathway = st.segmented_control(
             label="Select a pathway you are interested in learning:",
             options=eligible_options,
-            label_visibility="collapsed",  # Visual cleanup since heading clarifies purpose
+            label_visibility="collapsed",
             key="selected_exploration_pathway"
         )
         
