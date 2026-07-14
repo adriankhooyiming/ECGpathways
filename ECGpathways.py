@@ -2,7 +2,7 @@ import streamlit as st
 
 st.title("SEC 2027 Pathway Eligibility Checker")
 
-# --- 1. DEFINE SYLLABUS CATEGORIES (For L1R4 & ELR2B2 structural filtering) ---
+# --- 1. DEFINE SYLLABUS CATEGORIES (Based on MOE JAE Guidelines) ---
 # Removed 'Literature in Tamil' and 'Humanities (Social Studies, Literature in Tamil)'
 humanities_subjects = [
     "Literature in English", "History", "Geography", 
@@ -22,7 +22,6 @@ math_science_subjects = [
 mt_subjects = ["Chinese Language", "Malay Language", "Tamil Language", "Bengali", "Gujarati", "Hindi", "Panjabi", "Urdu"]
 hmt_subjects = ["Higher Chinese", "Higher Malay", "Higher Tamil"]
 
-# Removed 'Literature in Tamil' from G3-only list
 g3_only_subjects = [
     "Arabic as a 3rd Language", "Bahasa Indonesia as a 3rd Language", "Economics", 
     "Drama", "Spanish", "French", "German", "Japanese", "Physics", "Chemistry", 
@@ -52,10 +51,9 @@ g2_grades = ["1", "2", "3", "4", "5", "6"]
 # Strict MOE mapping from G3 grades to G2 equivalent values for B2 calculation
 def map_g3_to_g2_points(g3_grade):
     if g3_grade in ["A1", "A2", "B3"]: return 1
-    elif g3_grade in ["B4", "C5"]: return 2
-    elif g3_grade == "C6": return 3
-    elif g3_grade == "D7": return 4
-    elif g3_grade == "E8": return 5
+    elif g3_grade in ["B4", "C5", "C6"]: return 2
+    elif g3_grade == "D7": return 3
+    elif g3_grade == "E8": return 4
     return 9 # Grade 9 is excluded
 
 def check_g3_at_least(grade, target):
@@ -288,7 +286,6 @@ if selected_subjects:
         elif chosen_pathway == "Polytechnic Year 1":
             st.success("🚀 You are exploring the **Polytechnic Year 1** pathway option.")
             
-            # Updated to exact phrasing requested
             elr2b2_type = st.selectbox(
                 "Select your target course cluster (ELR2B2 Type):",
                 options=[
@@ -299,61 +296,80 @@ if selected_subjects:
                 ]
             )
             
+            # Pool of selected subjects and their grades
             g3_subs = {sub: grade for sub, grade in subject_grades.items() if subject_levels[sub] == "G3"}
             
             if "English Language" not in g3_subs:
                 st.error("❌ English Language must be taken at G3 level to compute an ELR2B2 score.")
             else:
                 el_score = g3_points[g3_subs["English Language"]]
-                pool = {s: v for s, v in g3_points.items() if s in g3_subs and s != "English Language" and g3_subs[s] != "9"}
                 
-                r1_pool = {}
-                r2_pool = {}
+                # Exclude English Language and any Grade 9 from the general pool
+                pool = {s: g3_points[g3_subs[s]] for s in g3_subs if s != "English Language" and g3_subs[s] != "9"}
                 
+                # --- Map JAE Subject Pools according to official MOE ELR2B2 Guidelines ---
+                g1_subjects = []
+                g2_subjects = []
+
                 if "ELR2B2-A" in elr2b2_type:
-                    r1_pool = {s: v for s, v in pool.items() if s in humanities_subjects or s in ["Art", "Business", "Economics"]}
+                    # R1 (1st Group of Relevant Subjects): Art or Humanities
+                    g1_subjects = humanities_subjects + ["Art", "Business", "Music", "Drama"]
+                    # R2 (2nd Group of Relevant Subjects): Art, Mathematics, Humanities, Accounts, MT
+                    g2_subjects = humanities_subjects + math_science_subjects + mt_subjects + hmt_subjects + ["Art", "Music", "Drama", "Business", "Design & Technology", "Nutrition and Food Science", "Principles of Accounts"]
+                
                 elif "ELR2B2-B" in elr2b2_type:
-                    r1_pool = {s: v for s, v in pool.items() if s in ["Mathematics", "Additional Mathematics"]}
-                    r2_pool = {s: v for s, v in pool.items() if s in humanities_subjects or s in math_science_subjects or s in ["Art", "Business", "Economics", "Principles of Accounts"]}
-                elif "ELR2B2-C" in elr2b2_type:
-                    r1_pool = {s: v for s, v in pool.items() if s in ["Mathematics", "Additional Mathematics"]}
-                    r2_pool = {s: v for s, v in pool.items() if s in math_science_subjects and s not in ["Mathematics", "Additional Mathematics"]}
-                elif "ELR2B2-D" in elr2b2_type:
-                    r1_pool = {s: v for s, v in pool.items() if s in ["Mathematics", "Additional Mathematics"]}
-                    r2_pool = {s: v for s, v in pool.items() if s in math_science_subjects or s in humanities_subjects or s in ["Art", "Design & Technology", "Nutrition and Food Science", "Principles of Accounts"]}
-
-                r1_sub, r1_score = None, 0
-                r2_sub, r2_score = None, 0
+                    # R1: Mathematics or Additional Mathematics
+                    g1_subjects = ["Mathematics", "Additional Mathematics"]
+                    # R2: Art, Business, Humanities, Principles of Accounts
+                    g2_subjects = humanities_subjects + ["Art", "Business", "Music", "Drama", "Principles of Accounts"]
                 
-                if r1_pool:
-                    r1_sub = min(r1_pool, key=r1_pool.get)
-                    r1_score = pool.pop(r1_sub)
-                    
-                if "ELR2B2-A" in elr2b2_type:
-                    r2_eligible = {s: v for s, v in pool.items() if s in math_science_subjects or s in humanities_subjects or s in ["Principles of Accounts", "Art", "Design & Technology"]}
-                    if r2_eligible:
-                        r2_sub = min(r2_eligible, key=r2_eligible.get)
-                        r2_score = pool.pop(r2_sub)
-                else:
-                    r2_filtered = {s: v for s, v in r2_pool.items() if s in pool}
-                    if r2_filtered:
-                        r2_sub = min(r2_filtered, key=r2_filtered.get)
-                        r2_score = pool.pop(r2_sub)
+                elif "ELR2B2-C" in elr2b2_type:
+                    # R1: Mathematics or Additional Mathematics
+                    g1_subjects = ["Mathematics", "Additional Mathematics"]
+                    # R2: Science subjects, Computing, D&T
+                    g2_subjects = ["Physics", "Chemistry", "Biology", "Science (Physics, Chemistry)", "Science (Physics, Biology)", "Science (Chemistry, Biology)", "Computing", "Electronics", "Biotechnology", "Design & Technology", "Nutrition and Food Science"]
+                
+                elif "ELR2B2-D" in elr2b2_type:
+                    # R1: Mathematics or Additional Mathematics
+                    g1_subjects = ["Mathematics", "Additional Mathematics"]
+                    # R2: Art, Sciences, Computing, Design, Nutrition, Media
+                    g2_subjects = ["Art", "Higher Art", "Physics", "Chemistry", "Biology", "Science (Physics, Chemistry)", "Science (Physics, Biology)", "Science (Chemistry, Biology)", "Computing", "Electronics", "Biotechnology", "Design & Technology", "Nutrition and Food Science"]
 
+                # --- Core Subject Processing & Sorting Logic ---
+                r1_sub, r1_score = None, None
+                r2_sub, r2_score = None, None
+                
+                # 1. Select the best R1 (from 1st Group of Relevant Subjects)
+                r1_eligible = {s: v for s, v in pool.items() if s in g1_subjects}
+                if r1_eligible:
+                    r1_sub = min(r1_eligible, key=r1_eligible.get)
+                    r1_score = pool.pop(r1_sub)
+                
+                # 2. Select the best R2 (from 2nd Group of Relevant Subjects, excluding what was picked for R1)
+                r2_eligible = {s: v for s, v in pool.items() if s in g2_subjects}
+                if r2_eligible:
+                    r2_sub = min(r2_eligible, key=r2_eligible.get)
+                    r2_score = pool.pop(r2_sub)
+
+                # Mother Tongue exclusion rule: Mother Tongue & Higher Mother Tongue cannot both be evaluated together
                 hmt_used = (r1_sub in hmt_subjects) or (r2_sub in hmt_subjects)
                 if hmt_used:
                     pool = {s: v for s, v in pool.items() if s not in mt_subjects}
-                    
+                
+                # Sort the remaining pool for the two best subjects (B1 and B2)
                 sorted_rem = sorted(pool.items(), key=lambda x: x[1])
                 
-                b1_sub, b1_score = None, 0
-                b2_sub, b2_score = None, 0
+                b1_sub, b1_score = None, None
+                b2_sub, b2_score = None, None
                 
+                # 3. Best 1 (B1): The next best remaining G3 subject (G3 raw score used)
                 if len(sorted_rem) >= 1:
                     b1_sub, b1_score = sorted_rem[0]
                 
+                # 4. Best 2 (B2): The next best subject, computed using G2 equivalent mapped grade
                 if len(sorted_rem) >= 2:
-                    b2_sub, orig_g3_grade = sorted_rem[1][0], g3_subs[sorted_rem[1][0]]
+                    b2_sub = sorted_rem[1][0]
+                    orig_g3_grade = g3_subs[b2_sub]
                     b2_score = map_g3_to_g2_points(orig_g3_grade)
 
                 st.markdown(f"### 📊 Your {elr2b2_type.split(' ')[0]} Breakdown")
@@ -363,7 +379,7 @@ if selected_subjects:
                 else:
                     col1, col2 = st.columns(2)
                     with col1:
-                        st.info(f"**Core Language & Relevant Subjects:**\n* **EL:** English Language → **{el_score}**\n* **R1:** {r1_sub} → **{r1_score}**\n* **R2:** {r2_sub} → **{r2_score}**")
+                        st.info(f"**Core Language & Relevant Subjects:**\n* **EL:** English Language → **{el_score}**\n* **R1 (1st Group):** {r1_sub} → **{r1_score}**\n* **R2 (2nd Group):** {r2_sub} → **{r2_score}**")
                     with col2:
                         st.info(f"**Best Subjects Pool:**\n* **B1 (G3 Raw):** {b1_sub} → **{b1_score}**\n* **B2 (Mapped to G2):** {b2_sub} → **{b2_score}** *(Mapped from G3)*")
                     
