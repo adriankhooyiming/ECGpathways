@@ -2,7 +2,7 @@ import streamlit as st
 
 st.title("SEC 2027 Pathway Eligibility Checker")
 
-# --- 1. DEFINE SYLLABUS CATEGORIES (Based on MOE PFP Guidelines) ---
+# --- 1. DEFINE SYLLABUS CATEGORIES (Based on MOE Guidelines) ---
 humanities_subjects = [
     "Literature in English", "History", "Geography", 
     "Humanities (Social Studies, Geography)", "Humanities (Social Studies, History)", 
@@ -56,7 +56,7 @@ def map_to_g2_points(level, grade):
         elif grade in ["B4", "C5", "C6"]: return 2
         elif grade == "D7": return 3
         elif grade == "E8": return 4
-        return 9 # Grade 9 or ungradable
+        return 9 
 
 def check_g3_at_least(grade, target):
     if grade not in g3_grades: return False
@@ -208,7 +208,6 @@ if selected_subjects:
     if jc_passed_rules: pathways["Junior College"]["open"] = True
     else: pathways["Junior College"]["reason"] = jc_reasons
 
-    # Rest of pathways activation rules
     if g3_count >= 4: pathways["Polytechnic Year 1"]["open"] = True
     if total_g2_g3_count >= 5: pathways["Polytechnic Foundation Programme"]["open"] = True
 
@@ -250,7 +249,6 @@ if selected_subjects:
                 l1_score = 0
             
             remaining_pool = {sub: score for sub, score in g3_scores.items() if sub != l1_sub}
-            
             if l1_sub in hmt_subjects:
                 remaining_pool = {sub: score for sub, score in remaining_pool.items() if sub not in mt_subjects}
 
@@ -284,7 +282,7 @@ if selected_subjects:
             else:
                 st.metric(label="Your Gross L1R4 Score", value=l1_r4_gross)
                 
-        # --- PATHWAY B: POLYTECHNIC YEAR 1 (ELR2B2 IMPLEMENTATION) ---
+        # --- PATHWAY B: POLYTECHNIC YEAR 1 ---
         elif chosen_pathway == "Polytechnic Year 1":
             st.success("🚀 You are exploring the **Polytechnic Year 1** pathway option.")
             
@@ -384,7 +382,7 @@ if selected_subjects:
                         else:
                             b2_sub = min(pool_g3, key=pool_g3.get)
                             orig_g3_grade = g3_subs[b2_sub]
-                            b2_score = map_g3_to_g2_points(orig_g3_grade)
+                            b2_score = map_to_g2_points("G3", orig_g3_grade)
                             b2_source_is_g2 = False
                     elif g3_count == 4:
                         if len(pool_g2) < 1:
@@ -410,41 +408,41 @@ if selected_subjects:
                     elr2b2_gross = el_score + r1_score + r2_score + b1_score + b2_score
                     st.metric(label="Calculated Gross ELR2B2 Score", value=elr2b2_gross)
 
-        # --- PATHWAY C: POLYTECHNIC FOUNDATION PROGRAMME (PFP ELMAB3) ---
+        # --- PATHWAY C: POLYTECHNIC FOUNDATION PROGRAMME (PFP ELMAB3 Unified Clusters) ---
         elif chosen_pathway == "Polytechnic Foundation Programme":
             st.success("🎓 You are exploring the **Polytechnic Foundation Programme (PFP)** pathway option.")
             
             pfp_cluster = st.segmented_control(
                 label="Select your target PFP course track:",
                 options=[
-                    "Cluster A (Sciences, Design, Engineering & Technology, Nursing)", 
-                    "Cluster B (Humanities, Art, Media & Business, Early Childhood)"
+                    "Science Cluster", 
+                    "Humanities, Art, Media and Business Cluster", 
+                    "Design, Engineering and Technology Cluster and Sub-clusters"
                 ],
                 key="selected_pfp_cluster"
             )
             
             if pfp_cluster:
-                # 1. Establish the pool converted completely down to G2 equivalent values
+                # 1. Establish the selection pool completely down to G2 equivalent values
                 g2_equivalent_pool = {}
                 for sub, grade in subject_grades.items():
                     level = subject_levels[sub]
-                    # Filter out invalid grades according to MOE parameters (G3 raw 9 or G2 5/6 cannot be used)
                     if (level == "G3" and grade == "9") or (level == "G2" and grade in ["5", "6"]):
                         continue
                     g2_equivalent_pool[sub] = map_to_g2_points(level, grade)
 
                 pfp_errors = []
                 
-                # 2. Extract Core Subjects
+                # 2. Extract Core Subject: English Language
                 if "English Language" not in g2_equivalent_pool:
-                    pfp_errors.append("English Language missing or grade does not meet PFP baseline parameters.")
+                    pfp_errors.append("English Language missing or grade does not meet PFP parameters.")
                     el_val = None
                 else:
                     el_val = g2_equivalent_pool.pop("English Language")
                     if el_val > 3:
                         pfp_errors.append(f"English Language G2-equivalent grade is {el_val} (Must be ≤ 3).")
 
-                # Find best Math subject
+                # 3. Extract Core Subject: Best Mathematics
                 math_candidates = {s: g2_equivalent_pool[s] for s in ["Mathematics", "Additional Mathematics"] if s in g2_equivalent_pool}
                 if not math_candidates:
                     pfp_errors.append("Mathematics or Additional Mathematics missing or grade does not meet entry requirements.")
@@ -454,67 +452,46 @@ if selected_subjects:
                     ma_val = g2_equivalent_pool.pop(ma_sub)
                     if ma_val > 3:
                         pfp_errors.append(f"{ma_sub} G2-equivalent grade is {ma_val} (Must be ≤ 3).")
-                    # Clear remaining math from pool if both offered
                     for s in list(math_candidates.keys()):
                         if s in g2_equivalent_pool: g2_equivalent_pool.pop(s)
 
-                # 3. Identify Group 1 (Relevant Subject) Requirements by Cluster Track
-                if "Cluster A" in pfp_cluster:
-                    cluster_title = "Cluster A"
-                    relevant_list = ["Design & Technology", "Nutrition and Food Science", "Science (Physics, Chemistry)", "Science (Physics, Biology)", "Science (Chemistry, Biology)", "Physics", "Chemistry", "Biology"]
-                else:
-                    cluster_title = "Cluster B"
-                    relevant_list = humanities_subjects + ["Art", "Principles of Accounts"]
-
-                # Extract Group 1 Relevant Subject (RA)
-                ra_candidates = {s: g2_equivalent_pool[s] for s in g2_equivalent_pool if s in relevant_list}
-                if not ra_candidates:
-                    pfp_errors.append(f"Missing a relevant subject for {cluster_title}. (Must be grade ≤ 3).")
-                    ra_sub, ra_val = None, None
-                else:
-                    ra_sub = min(ra_candidates, key=ra_candidates.get)
-                    ra_val = g2_equivalent_pool.pop(ra_sub)
-                    if ra_val > 3:
-                        pfp_errors.append(f"Your best relevant subject ({ra_sub}) grade is {ra_val} (Must be ≤ 3).")
-
-                # Handle Mother Tongue exclusion logic (Single better score between HMT and MT)
+                # Mother Tongue filtering constraint (Only hold the singular best candidate out of MT/HMT pool)
                 hmt_present = [s for s in g2_equivalent_pool if s in hmt_subjects]
                 if hmt_present:
                     best_hmt = min(hmt_present, key=lambda x: g2_equivalent_pool[x])
-                    # Remove other HMTs and MTs from selection pool
                     for s in list(g2_equivalent_pool.keys()):
                         if s in mt_subjects or (s in hmt_subjects and s != best_hmt):
                             g2_equivalent_pool.pop(s)
 
-                # 4. Extract Best 2 Subjects (B1 & B2)
+                # 4. Extract 3 Best Remaining Subjects (B3 Pool)
                 sorted_remainder = sorted(g2_equivalent_pool.items(), key=lambda x: x[1])
                 b_subjects = []
                 
-                for s, v in sorted_remainder[:2]:
+                for s, v in sorted_remainder[:3]:
                     if v > 4:
                         pfp_errors.append(f"Best Subject candidate '{s}' grade is {v} (Must be ≤ 4).")
                     b_subjects.append((s, v))
 
-                if len(b_subjects) < 2 and not pfp_errors:
-                    pfp_errors.append(f"Insufficient total subjects to complete the ELMAB3 structure (Offered {len(b_subjects) + 3} valid subjects, requires 5).")
+                if len(b_subjects) < 3 and not pfp_errors:
+                    pfp_errors.append(f"Insufficient total subjects to complete the ELMAB3 structure (Offered {len(b_subjects) + 2} valid subjects, requires 5).")
 
-                st.markdown(f"### 📊 PFP {cluster_title} ELMAB3 Breakdown")
+                st.markdown(f"### 📊 PFP {pfp_cluster} ELMAB3 Breakdown")
                 if pfp_errors:
-                    st.error("❌ **Cannot calculate valid PFP profile due to the following requirements:**")
+                    st.error("❌ **Cannot calculate valid PFP profile due to the following criteria constraints:**")
                     for err in pfp_errors:
                         st.markdown(f"* {err}")
                 else:
                     col1, col2 = st.columns(2)
                     with col1:
-                        st.info(f"**Core Targets (Max Grade 3):**\n* **EL:** English Language $\\rightarrow$ **{el_val}**\n* **MA:** {ma_sub} $\\rightarrow$ **{ma_val}**\n* **Relevant Subject:** {ra_sub} $\\rightarrow$ **{ra_val}**")
+                        st.info(f"**Core Components (Max Grade 3):**\n* **EL:** English Language $\\rightarrow$ **{el_val}**\n* **MA:** {ma_sub} $\\rightarrow$ **{ma_val}**")
                     with col2:
-                        b_text = "\n".join([f"* **{i+1}:** {s} $\\rightarrow$ **{v}**" for i, (s, v) in enumerate(b_subjects)])
-                        st.info(f"**Best 2 Electives (Max Grade 4):**\n{b_text}")
+                        b_text = "\n".join([f"* **B{i+1}:** {s} $\\rightarrow$ **{v}**" for i, (s, v) in enumerate(b_subjects)])
+                        st.info(f"**3 Best Elective Subjects (Max Grade 4):**\n{b_text}")
                     
-                    elmab3_gross = el_val + ma_val + ra_val + sum([v for _, v in b_subjects])
+                    elmab3_gross = el_val + ma_val + sum([v for _, v in b_subjects])
                     
                     if elmab3_gross <= 12:
-                        st.metric(label="Your Gross ELMAB3 Score", value=elmab3_gross, help="Calculated using G2 equivalent values.")
+                        st.metric(label="Your Gross ELMAB3 Score", value=elmab3_gross, help="Calculated using unified G2 equivalent mapping scales.")
                         st.success("🎉 Your score meets the PFP baseline entry criteria of ≤ 12 points!")
                     else:
                         st.metric(label="Your Gross ELMAB3 Score", value=elmab3_gross)
