@@ -2,7 +2,7 @@ import streamlit as st
 
 st.title("SEC 2027 Pathway Eligibility Checker")
 
-# --- 1. DEFINE SYLLABUS CATEGORIES (For L1R4 structural filtering) ---
+# --- 1. DEFINE SYLLABUS CATEGORIES (For L1R4 & ELR2B2 structural filtering) ---
 humanities_subjects = [
     "Literature in English", "History", "Geography", 
     "Humanities (Social Studies, Geography)", "Humanities (Social Studies, History)", 
@@ -48,6 +48,15 @@ all_selectable_subjects = sorted(list(set(g3_only_subjects + overlapping_subject
 g3_grades = ["A1", "A2", "B3", "B4", "C5", "C6", "D7", "E8", "9"]
 g3_points = {"A1": 1, "A2": 2, "B3": 3, "B4": 4, "C5": 5, "C6": 6, "D7": 7, "E8": 8, "9": 9}
 g2_grades = ["1", "2", "3", "4", "5", "6"]
+
+# Strict MOE mapping from G3 grades to G2 equivalent values for B2 calculation
+def map_g3_to_g2_points(g3_grade):
+    if g3_grade in ["A1", "A2", "B3"]: return 1
+    elif g3_grade in ["B4", "C5"]: return 2
+    elif g3_grade == "C6": return 3
+    elif g3_grade == "D7": return 4
+    elif g3_grade == "E8": return 5
+    return 9 # Grade 9 is excluded
 
 def check_g3_at_least(grade, target):
     if grade not in g3_grades: return False
@@ -220,7 +229,6 @@ if selected_subjects:
         if chosen_pathway == "Junior College":
             st.success("🎉 You are exploring the **Junior College / Millennia Institute** pathway option.")
             
-            # L1R4 CALCULATION ALGORITHM (STRICTLY G3 ONLY)
             g3_scores = {
                 sub: g3_points[grade] 
                 for sub, grade in subject_grades.items() 
@@ -276,15 +284,32 @@ if selected_subjects:
             else:
                 st.metric(label="Your Gross L1R4 Score", value=l1r4_gross)
                 
-        # --- PATHWAY B: POLYTECHNIC YEAR 1 ---
+        # --- PATHWAY B: POLYTECHNIC YEAR 1 (ELR2B2 IMPLEMENTATION) ---
         elif chosen_pathway == "Polytechnic Year 1":
             st.success("🚀 You are exploring the **Polytechnic Year 1** pathway option.")
-            st.info("The configuration setup for Polytechnic Year 1 has been initialized. Calculation logic will be added next.")
-
-        # --- PATHWAY C: PFP ---
-        elif chosen_pathway:
-            st.info(f"You have selected **{chosen_pathway}**.")
-    else:
-        st.warning("You do not currently qualify for any educational pathways based on these grades.")
-else:
-    st.info("Please choose your subjects above to calculate your eligibility.")
+            
+            # Sub-step Selection for the specific ELR2B2 Aggregate Type
+            elr2b2_type = st.selectbox(
+                "Select your target course cluster (ELR2B2 Type):",
+                options=["ELR2B2-A (Humanities/Business)", "ELR2B2-B (Science/Math-heavy Business)", "ELR2B2-C (Engineering/Science)", "ELR2B2-D (Design/Media)"]
+            )
+            
+            # Filter strictly down to current operational G3 entries
+            g3_subs = {sub: grade for sub, grade in subject_grades.items() if subject_levels[sub] == "G3"}
+            
+            if "English Language" not in g3_subs:
+                st.error("❌ English Language must be taken at G3 level to compute an ELR2B2 score.")
+            else:
+                el_score = g3_points[g3_subs["English Language"]]
+                
+                # Setup master pool excluding English
+                pool = {s: g3_points[g] for s, g in g3_subs.items() if s != "English Language" and g != "9"}
+                
+                r1_pool = {}
+                r2_pool = {}
+                
+                # --- APPLY MOE STRUCTURAL FILTERS PER AGGREGATE TYPE ---
+                if "ELR2B2-A" in elr2b2_type:
+                    # R1: Best from Humanities Group
+                    r1_pool = {s: v for s, v in pool.items() if s in humanities_subjects or s in ["Art", "Business", "Economics"]}
+                elif "ELR
