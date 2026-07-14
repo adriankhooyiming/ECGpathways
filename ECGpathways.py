@@ -7,10 +7,9 @@ humanities_subjects = [
     "Literature in English", "History", "Geography", 
     "Humanities (Social Studies, Geography)", "Humanities (Social Studies, History)", 
     "Humanities (Social Studies, Literature in English)", "Economics", "Drama",
-    "Literature in Chinese", "Literature in Malay", "Literature in Tamil",
+    "Literature in Chinese", "Literature in Malay",
     "Humanities (Social Studies, Literature in Chinese)", 
-    "Humanities (Social Studies, Literature in Malay)", 
-    "Humanities (Social Studies, Literature in Tamil)"
+    "Humanities (Social Studies, Literature in Malay)"
 ]
 
 math_science_subjects = [
@@ -27,8 +26,7 @@ g3_only_subjects = [
     "Drama", "Spanish", "French", "German", "Japanese", "Physics", "Chemistry", 
     "Biology", "Electronics", "Music", "Higher Music", "Higher Art", "Biotechnology", 
     "Design Studies", "Higher Chinese", "Chinese (Special Programme)", "Literature in Chinese",
-    "Higher Malay", "Malay (Special Programme)", "Literature in Malay", "Higher Tamil", 
-    "Literature in Tamil", "Exercise And Sports Science", "Business"
+    "Higher Malay", "Malay (Special Programme)", "Literature in Malay", "Higher Tamil", "Exercise And Sports Science", "Business"
 ]
 
 overlapping_subjects = [
@@ -36,7 +34,6 @@ overlapping_subjects = [
     "History", "Geography", "Humanities (Social Studies, Geography)", 
     "Humanities (Social Studies, History)", "Humanities (Social Studies, Literature in English)", 
     "Humanities (Social Studies, Literature in Malay)", "Humanities (Social Studies, Literature in Chinese)",
-    "Humanities (Social Studies, Literature in Tamil)",
     "Computing", "Science (Physics, Chemistry)", "Science (Physics, Biology)", 
     "Science (Chemistry, Biology)", "Nutrition and Food Science", "Art", 
     "Design & Technology", "Principles of Accounts"
