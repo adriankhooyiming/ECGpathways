@@ -411,7 +411,7 @@ if selected_subjects:
                     elr2b2_gross = el_score + r1_score + r2_score + b1_score + b2_score
                     st.metric(label="Calculated Gross ELR2B2 Score", value=elr2b2_gross)
 
-        # --- PATHWAY C: POLYTECHNIC FOUNDATION PROGRAMME (PFP ELMAB3 Clusters Restructured) ---
+        # --- PATHWAY C: POLYTECHNIC FOUNDATION PROGRAMME (PFP ELMAB3 Detailed Validation) ---
         elif chosen_pathway == "Polytechnic Foundation Programme":
             st.success("🎓 You are exploring the **Polytechnic Foundation Programme (PFP)** pathway option.")
             
@@ -473,16 +473,28 @@ if selected_subjects:
                         if s in g2_equivalent_pool: 
                             g2_equivalent_pool.pop(s)
 
-                # 4. Extract One Relevant Subject (Must be <= 3)
-                available_relevant_subs = {s: g2_equivalent_pool[s] for s in relevant_subject_pool if s in g2_equivalent_pool}
-                if not available_relevant_subs:
-                    pfp_errors.append(f"Missing a required **Relevant Subject** for the {pfp_cluster} with a grade of ≤ 3.")
+                # 4. Extract One Relevant Subject (Must be <= 3) with Detailed Feedback
+                selected_relevant_subs = [s for s in subject_grades if s in relevant_subject_pool]
+                available_relevant_subs = {
+                    s: g2_equivalent_pool[s] 
+                    for s in selected_relevant_subs 
+                    if s in g2_equivalent_pool and g2_equivalent_pool[s] <= 3
+                }
+                
+                if not selected_relevant_subs:
+                    pfp_errors.append(f"You have not selected any relevant subjects required for the **{pfp_cluster}**.")
+                    rel_sub, rel_val = None, None
+                elif not available_relevant_subs:
+                    pfp_errors.append(f"None of your selected relevant subjects for the **{pfp_cluster}** meet the minimum grade requirement of **3** or better:")
+                    for s in selected_relevant_subs:
+                        lvl = subject_levels[s]
+                        grd = subject_grades[s]
+                        equiv_val = map_to_g2_points(lvl, grd)
+                        pfp_errors.append(f"  * **{s}** (taken at {lvl} level with grade **{grd}**) maps to a G2-equivalent grade of **{equiv_val}** (Must be ≤ 3).")
                     rel_sub, rel_val = None, None
                 else:
                     rel_sub = min(available_relevant_subs, key=available_relevant_subs.get)
                     rel_val = g2_equivalent_pool.pop(rel_sub)
-                    if rel_val > 3:
-                        pfp_errors.append(f"Your best relevant subject ('{rel_sub}') grade is {rel_val} (Must be ≤ 3 for this cluster).")
 
                 # Mother Tongue filtering constraint (Keep only the single best candidate out of MT/HMT pool)
                 hmt_present = [s for s in g2_equivalent_pool if s in hmt_subjects]
