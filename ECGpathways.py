@@ -130,7 +130,7 @@ if selected_subjects:
     total_g2_g3_count = g3_count + g2_count
     
     pathways = {
-        "Junior College": {"open": False, "reason": []},
+        "Junior College / MI": {"open": False, "reason": []},
         "Polytechnic Year 1": {"open": False, "reason": []},
         "Polytechnic Foundation Programme": {"open": False, "reason": []}
     }
@@ -208,8 +208,8 @@ if selected_subjects:
         else:
             jc_reasons.extend(mt_failures)
 
-    if jc_passed_rules: pathways["Junior College"]["open"] = True
-    else: pathways["Junior College"]["reason"] = jc_reasons
+    if jc_passed_rules: pathways["Junior College / MI"]["open"] = True
+    else: pathways["Junior College / MI"]["reason"] = jc_reasons
 
     if g3_count >= 4: pathways["Polytechnic Year 1"]["open"] = True
     if total_g2_g3_count >= 5: pathways["Polytechnic Foundation Programme"]["open"] = True
@@ -227,8 +227,8 @@ if selected_subjects:
             key="selected_exploration_pathway"
         )
         
-        # --- PATHWAY A: JUNIOR COLLEGE ---
-        if chosen_pathway == "Junior College":
+        # --- PATHWAY A: JUNIOR COLLEGE / MILLENNIA INSTITUTE ---
+        if chosen_pathway == "Junior College / MI":
             st.success("🎉 You are exploring the **Junior College / Millennia Institute** pathway option.")
             
             g3_scores = {
@@ -285,7 +285,15 @@ if selected_subjects:
             else:
                 st.metric(label="Your Gross L1R4 Score", value=l1_r4_gross)
                 
-        # --- PATHWAY B: POLYTECHNIC YEAR 1 (Detailed Validation & 22-Point Cap Check) ---
+                # --- NEW: DETAILED SCORE AND ELIGIBILITY SEGREGATION ---
+                if l1_r4_gross <= 16:
+                    st.success("✅ **Eligibility Status:** You are eligible for admission to **both** **Junior College (JC)** and **Millennia Institute (MI)**.")
+                elif l1_r4_gross <= 20:
+                    st.warning("⚠️ **Eligibility Status:** You are eligible for **Millennia Institute (MI)** admission only. (Your score exceeds 16, so you do not qualify for Junior College admission).")
+                else:
+                    st.error("❌ **Eligibility Status:** Your L1R4 aggregate score exceeds 20. You are **not eligible** for both Junior College and Millennia Institute admission.")
+                
+        # --- PATHWAY B: POLYTECHNIC YEAR 1 ---
         elif chosen_pathway == "Polytechnic Year 1":
             st.success("🚀 You are exploring the **Polytechnic Year 1** pathway option.")
             
@@ -336,7 +344,6 @@ if selected_subjects:
                 r1_eligible = {s: v for s, v in pool_g3.items() if s in g1_subjects}
                 if not r1_eligible:
                     unmet_reasons.append(f"Missing an eligible G3 subject from the **1st Group of Relevant Subjects (R1)** required for {elr2b2_type.split(' ')[0]}.")
-                    # Specify offered subjects that failed the requirement
                     offered_r1_candidates = [s for s in selected_subjects if s in g1_subjects]
                     if offered_r1_candidates:
                         unmet_reasons.append("The following candidate subjects were offered but failed because they are not at G3 level or lack a valid grade:")
@@ -352,7 +359,6 @@ if selected_subjects:
                 r2_eligible = {s: v for s, v in pool_g3.items() if s in g2_subjects}
                 if not r2_eligible:
                     unmet_reasons.append(f"Missing an eligible G3 subject from the **2nd Group of Relevant Subjects (R2)** required for {elr2b2_type.split(' ')[0]}.")
-                    # Specify offered subjects that failed the requirement
                     offered_r2_candidates = [s for s in selected_subjects if s in g2_subjects]
                     if offered_r2_candidates:
                         unmet_reasons.append("The following candidate subjects were offered but failed because they are not at G3 level or lack a valid grade:")
@@ -390,7 +396,6 @@ if selected_subjects:
                     elif g3_count == 4:
                         if len(pool_g2) < 1:
                             unmet_reasons.append("For students offering exactly 4 G3 subjects, you must provide at least 1 eligible G2 subject (Grade 1-4) for **Best 2 (B2)**.")
-                            # Specify offered G2 subjects that failed
                             offered_g2_candidates = [s for s in selected_subjects if subject_levels[s] == "G2"]
                             if offered_g2_candidates:
                                 unmet_reasons.append("The following G2 subjects were offered but their grades do not meet the minimum criteria (Grade 1-4):")
@@ -416,7 +421,6 @@ if selected_subjects:
                     
                     elr2b2_gross = el_score + r1_score + r2_score + b1_score + b2_score
                     
-                    # --- ADDED: 22-POINT CRITERIA VALIDATION ---
                     if elr2b2_gross <= 22:
                         st.metric(label="Calculated Gross ELR2B2 Score", value=elr2b2_gross)
                         st.success("🎉 Your score meets the Polytechnic baseline entry requirement of ≤ 22 points!")
@@ -439,7 +443,6 @@ if selected_subjects:
             )
             
             if pfp_cluster:
-                # 1. Map all offered grades down to G2 equivalent values (excluding failing grades)
                 g2_equivalent_pool = {}
                 for sub, grade in subject_grades.items():
                     level = subject_levels[sub]
@@ -449,10 +452,9 @@ if selected_subjects:
 
                 pfp_errors = []
                 
-                # Define relevant subjects pool based on cluster selection
                 if pfp_cluster in ["Science Cluster", "Design, Engineering and Technology Cluster and Sub-clusters"]:
                     relevant_subject_pool = ["Design & Technology", "Nutrition and Food Science"] + science_subjects
-                else: # HAMB Cluster
+                else: 
                     relevant_subject_pool = [
                         "Art", "Geography", "History", 
                         "Humanities (Social Studies, Geography)", 
@@ -461,7 +463,6 @@ if selected_subjects:
                         "Literature in English", "Principles of Accounts"
                     ]
 
-                # 2. Extract Core Subject: English Language (Must be <= 3)
                 if "English Language" not in g2_equivalent_pool:
                     pfp_errors.append("English Language is missing or grade does not meet PFP parameters.")
                     el_val = None
@@ -470,7 +471,6 @@ if selected_subjects:
                     if el_val > 3:
                         pfp_errors.append(f"English Language G2-equivalent grade is {el_val} (Must be ≤ 3).")
 
-                # 3. Extract Core Subject: Best Mathematics (Must be <= 3)
                 math_candidates = {s: g2_equivalent_pool[s] for s in math_subjects if s in g2_equivalent_pool}
                 if not math_candidates:
                     pfp_errors.append("Mathematics or Additional Mathematics is missing or grade does not meet entry requirements.")
@@ -481,12 +481,10 @@ if selected_subjects:
                     if ma_val > 3:
                         pfp_errors.append(f"{ma_sub} G2-equivalent grade is {ma_val} (Must be ≤ 3).")
                     
-                    # Ensure remaining math subjects are cleaned from the pool to avoid double-dipping as math
                     for s in list(math_candidates.keys()):
                         if s in g2_equivalent_pool: 
                             g2_equivalent_pool.pop(s)
 
-                # 4. Extract One Relevant Subject (Must be <= 3) with Detailed Feedback
                 selected_relevant_subs = [s for s in subject_grades if s in relevant_subject_pool]
                 available_relevant_subs = {
                     s: g2_equivalent_pool[s] 
@@ -509,7 +507,6 @@ if selected_subjects:
                     rel_sub = min(available_relevant_subs, key=available_relevant_subs.get)
                     rel_val = g2_equivalent_pool.pop(rel_sub)
 
-                # Mother Tongue filtering constraint (Keep only the single best candidate out of MT/HMT pool)
                 hmt_present = [s for s in g2_equivalent_pool if s in hmt_subjects]
                 if hmt_present:
                     best_hmt = min(hmt_present, key=lambda x: g2_equivalent_pool[x])
@@ -517,7 +514,6 @@ if selected_subjects:
                         if s in mt_subjects or (s in hmt_subjects and s != best_hmt):
                             g2_equivalent_pool.pop(s)
 
-                # 5. Extract Best 2 Remaining Subjects (B1, B2) (Must be <= 4)
                 sorted_remainder = sorted(g2_equivalent_pool.items(), key=lambda x: x[1])
                 b_subjects = []
                 
