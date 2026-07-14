@@ -296,14 +296,20 @@ if selected_subjects:
             )
             
             g3_subs = {sub: grade for sub, grade in subject_grades.items() if subject_levels[sub] == "G3"}
+            g2_subs = {sub: grade for sub, grade in subject_grades.items() if subject_levels[sub] == "G2"}
             
             if "English Language" not in g3_subs:
                 st.error("❌ English Language must be taken at G3 level to compute an ELR2B2 score.")
             else:
                 el_score = g3_points[g3_subs["English Language"]]
-                pool = {s: g3_points[g3_subs[s]] for s in g3_subs if s != "English Language" and g3_subs[s] != "9"}
                 
-                # Setup mapping pools
+                # Setup G3 subject pools (G3 raw Grade 9 cannot be used)
+                pool_g3 = {s: g3_points[g3_subs[s]] for s in g3_subs if s != "English Language" and g3_subs[s] != "9"}
+                
+                # Setup G2 subject pools (G2 Grades 5 and 6 cannot be used)
+                pool_g2 = {s: int(g2_subs[s]) for s in g2_subs if g2_subs[s] not in ["5", "6"]}
+                
+                # Setup JAE subject categories
                 g1_subjects = []
                 g2_subjects = []
 
@@ -325,47 +331,62 @@ if selected_subjects:
                 r2_sub, r2_score = None, None
                 b1_sub, b1_score = None, None
                 b2_sub, b2_score = None, None
+                b2_source_is_g2 = False
 
-                # 1. Evaluate R1
-                r1_eligible = {s: v for s, v in pool.items() if s in g1_subjects}
+                # 1. Evaluate R1 (G3 level required)
+                r1_eligible = {s: v for s, v in pool_g3.items() if s in g1_subjects}
                 if not r1_eligible:
                     unmet_reasons.append("Missing an eligible G3 subject from the **1st Group of Relevant Subjects (R1)**.")
                 else:
                     r1_sub = min(r1_eligible, key=r1_eligible.get)
-                    r1_score = pool.pop(r1_sub)
+                    r1_score = pool_g3.pop(r1_sub)
                 
-                # 2. Evaluate R2
-                r2_eligible = {s: v for s, v in pool.items() if s in g2_subjects}
+                # 2. Evaluate R2 (G3 level required)
+                r2_eligible = {s: v for s, v in pool_g3.items() if s in g2_subjects}
                 if not r2_eligible:
                     unmet_reasons.append("Missing an eligible G3 subject from the **2nd Group of Relevant Subjects (R2)**.")
                 else:
                     r2_sub = min(r2_eligible, key=r2_eligible.get)
-                    r2_score = pool.pop(r2_sub)
+                    r2_score = pool_g3.pop(r2_sub)
 
-                # Mother Tongue exclusion logic (safely checked if subjects were assigned)
+                # Mother Tongue exclusion logic
                 hmt_used = (r1_sub in hmt_subjects) or (r2_sub in hmt_subjects) if (r1_sub or r2_sub) else False
                 if hmt_used:
-                    pool = {s: v for s, v in pool.items() if s not in mt_subjects}
+                    pool_g3 = {s: v for s, v in pool_g3.items() if s not in mt_subjects}
+                    pool_g2 = {s: v for s, v in pool_g2.items() if s not in mt_subjects}
                 
-                sorted_rem = sorted(pool.items(), key=lambda x: x[1])
-                
-                # 3. Evaluate Best 1 (B1)
-                if len(sorted_rem) < 1:
-                    unmet_reasons.append("Insufficient remaining G3 subjects to satisfy the **Best 1 (B1)** requirement.")
+                # 3. Evaluate Best 1 (B1) (G3 level required)
+                sorted_g3_rem = sorted(pool_g3.items(), key=lambda x: x[1])
+                if len(sorted_g3_rem) < 1:
+                    unmet_reasons.append("Insufficient remaining G3 subjects to satisfy the **Best 1 (B1)** requirement (must be a G3 subject).")
                 else:
-                    b1_sub, b1_score = sorted_rem[0]
-                
+                    b1_sub, b1_score = sorted_g3_rem[0]
+                    pool_g3.pop(b1_sub)
+
                 # 4. Evaluate Best 2 (B2)
-                if len(sorted_rem) < 2:
-                    unmet_reasons.append("Insufficient remaining G3 subjects to satisfy the **Best 2 (B2)** requirement.")
+                # Scenario A: Student takes >= 5 G3 subjects (using the remaining pool_g3)
+                if g3_count >= 5:
+                    if len(pool_g3) < 1:
+                        unmet_reasons.append("Missing a 5th G3 subject to compute **Best 2 (B2)** via grade mapping.")
+                    else:
+                        b2_sub = min(pool_g3, key=pool_g3.get)
+                        orig_g3_grade = g3_subs[b2_sub]
+                        b2_score = map_g3_to_g2_points(orig_g3_grade)
+                        b2_source_is_g2 = False
+
+                # Scenario B: Student takes exactly 4 G3 subjects with at least 1 G2 subject
+                elif g3_count == 4:
+                    if len(pool_g2) < 1:
+                        unmet_reasons.append("For students offering exactly 4 G3 subjects, you must provide at least 1 eligible G2 subject (grade 1 to 4) for **Best 2 (B2)**.")
+                    else:
+                        b2_sub = min(pool_g2, key=pool_g2.get)
+                        b2_score = pool_g2[b2_sub]  # Kept exactly as it is on the G2 scale
+                        b2_source_is_g2 = True
                 else:
-                    b2_sub = sorted_rem[1][0]
-                    orig_g3_grade = g3_subs[b2_sub]
-                    b2_score = map_g3_to_g2_points(orig_g3_grade)
+                    unmet_reasons.append("An ELR2B2 score requires a minimum of 4 G3 subjects (EL, R1, R2, B1) and either a 5th G3 subject (mapped) or a G2 subject (as is) for B2.")
 
                 st.markdown(f"### 📊 Your {elr2b2_type.split(' ')[0]} Breakdown")
                 
-                # Check if calculations are complete, if not, output the specific issues
                 if unmet_reasons:
                     st.error("❌ **Cannot Calculate ELR2B2 Score due to unmet criteria:**")
                     for reason in unmet_reasons:
@@ -375,7 +396,8 @@ if selected_subjects:
                     with col1:
                         st.info(f"**Core Language & Relevant Subjects:**\n* **EL:** English Language → **{el_score}**\n* **R1 (1st Group):** {r1_sub} → **{r1_score}**\n* **R2 (2nd Group):** {r2_sub} → **{r2_score}**")
                     with col2:
-                        st.info(f"**Best Subjects Pool:**\n* **B1 (G3 Raw):** {b1_sub} → **{b1_score}**\n* **B2 (Mapped to G2):** {b2_sub} → **{b2_score}** *(Mapped from G3)*")
+                        b2_label = f"**B2 (G2 Grade as is):** {b2_sub} → **{b2_score}**" if b2_source_is_g2 else f"**B2 (Mapped to G2):** {b2_sub} → **{b2_score}** *(Mapped from G3)*"
+                        st.info(f"**Best Subjects Pool:**\n* **B1 (G3 Raw):** {b1_sub} → **{b1_score}**\n* {b2_label}")
                     
                     elr2b2_gross = el_score + r1_score + r2_score + b1_score + b2_score
                     st.metric(label="Calculated Gross ELR2B2 Score", value=elr2b2_gross)
