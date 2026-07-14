@@ -53,7 +53,7 @@ def map_g3_to_g2_points(g3_grade):
     elif g3_grade in ["B4", "C5", "C6"]: return 2
     elif g3_grade == "D7": return 3
     elif g3_grade == "E8": return 4
-    return 9 # Grade 9 is excluded
+    return 9 
 
 def check_g3_at_least(grade, target):
     if grade not in g3_grades: return False
@@ -267,7 +267,7 @@ if selected_subjects:
                 r_subjects_chosen.append((sub, score))
                 r_score_total += score
 
-            l1r4_gross = l1_score + r_score_total
+            l1_r4_gross = l1_score + r_score_total
             
             st.markdown("### 📊 Your MOE L1R4 Aggregate Breakdown (G3 Subjects Only)")
             col_l1, col_r = st.columns(2)
@@ -279,7 +279,7 @@ if selected_subjects:
             if len(r_subjects_chosen) < 4 or l1_score == 0:
                 st.warning(f"⚠️ **Note:** You only have {len(r_subjects_chosen) + (1 if l1_score > 0 else 0)} eligible G3 subjects. A complete L1R4 calculation requires at least 5 G3 level subjects.")
             else:
-                st.metric(label="Your Gross L1R4 Score", value=l1r4_gross)
+                st.metric(label="Your Gross L1R4 Score", value=l1_r4_gross)
                 
         # --- PATHWAY B: POLYTECHNIC YEAR 1 (ELR2B2 IMPLEMENTATION) ---
         elif chosen_pathway == "Polytechnic Year 1":
@@ -336,7 +336,16 @@ if selected_subjects:
                 # 1. Evaluate R1 (G3 level required)
                 r1_eligible = {s: v for s, v in pool_g3.items() if s in g1_subjects}
                 if not r1_eligible:
-                    unmet_reasons.append("Missing an eligible G3 subject from the **1st Group of Relevant Subjects (R1)**.")
+                    if g3_count == 4:
+                        # Find if any of the user's Step 1 selections match the missing R1 criteria but are taken at G2
+                        upgradeable_for_r1 = [s for s in selected_subjects if s in g1_subjects and subject_levels.get(s) == "G2"]
+                        if upgradeable_for_r1:
+                            subjects_str = ", ".join([f"**{s}**" for s in upgradeable_for_r1])
+                            unmet_reasons.append(f"Missing an eligible G3 subject for **R1**. Based on your selected subjects, you need to change the level of {subjects_str} from G2 to **G3**.")
+                        else:
+                            unmet_reasons.append("Missing an eligible G3 subject from the **1st Group of Relevant Subjects (R1)**.")
+                    else:
+                        unmet_reasons.append("Missing an eligible G3 subject from the **1st Group of Relevant Subjects (R1)**.")
                 else:
                     r1_sub = min(r1_eligible, key=r1_eligible.get)
                     r1_score = pool_g3.pop(r1_sub)
@@ -344,7 +353,16 @@ if selected_subjects:
                 # 2. Evaluate R2 (G3 level required)
                 r2_eligible = {s: v for s, v in pool_g3.items() if s in g2_subjects}
                 if not r2_eligible:
-                    unmet_reasons.append("Missing an eligible G3 subject from the **2nd Group of Relevant Subjects (R2)**.")
+                    if g3_count == 4:
+                        # Find if any of the user's Step 1 selections match the missing R2 criteria but are taken at G2
+                        upgradeable_for_r2 = [s for s in selected_subjects if s in g2_subjects and subject_levels.get(s) == "G2"]
+                        if upgradeable_for_r2:
+                            subjects_str = ", ".join([f"**{s}**" for s in upgradeable_for_r2])
+                            unmet_reasons.append(f"Missing an eligible G3 subject for **R2**. Based on your selected subjects, you need to change the level of {subjects_str} from G2 to **G3**.")
+                        else:
+                            unmet_reasons.append("Missing an eligible G3 subject from the **2nd Group of Relevant Subjects (R2)**.")
+                    else:
+                        unmet_reasons.append("Missing an eligible G3 subject from the **2nd Group of Relevant Subjects (R2)**.")
                 else:
                     r2_sub = min(r2_eligible, key=r2_eligible.get)
                     r2_score = pool_g3.pop(r2_sub)
@@ -357,33 +375,34 @@ if selected_subjects:
                 
                 # 3. Evaluate Best 1 (B1) (G3 level required)
                 sorted_g3_rem = sorted(pool_g3.items(), key=lambda x: x[1])
-                if len(sorted_g3_rem) < 1:
+                if len(sorted_g3_rem) < 1 and not unmet_reasons:
                     unmet_reasons.append("Insufficient remaining G3 subjects to satisfy the **Best 1 (B1)** requirement (must be a G3 subject).")
-                else:
+                elif len(sorted_g3_rem) >= 1:
                     b1_sub, b1_score = sorted_g3_rem[0]
                     pool_g3.pop(b1_sub)
 
                 # 4. Evaluate Best 2 (B2)
-                # Scenario A: Student takes >= 5 G3 subjects (using the remaining pool_g3)
-                if g3_count >= 5:
-                    if len(pool_g3) < 1:
-                        unmet_reasons.append("Missing a 5th G3 subject to compute **Best 2 (B2)** via grade mapping.")
-                    else:
-                        b2_sub = min(pool_g3, key=pool_g3.get)
-                        orig_g3_grade = g3_subs[b2_sub]
-                        b2_score = map_g3_to_g2_points(orig_g3_grade)
-                        b2_source_is_g2 = False
+                if not unmet_reasons:
+                    # Scenario A: Student takes >= 5 G3 subjects (using the remaining pool_g3)
+                    if g3_count >= 5:
+                        if len(pool_g3) < 1:
+                            unmet_reasons.append("Missing a 5th G3 subject to compute **Best 2 (B2)** via grade mapping.")
+                        else:
+                            b2_sub = min(pool_g3, key=pool_g3.get)
+                            orig_g3_grade = g3_subs[b2_sub]
+                            b2_score = map_g3_to_g2_points(orig_g3_grade)
+                            b2_source_is_g2 = False
 
-                # Scenario B: Student takes exactly 4 G3 subjects with at least 1 G2 subject
-                elif g3_count == 4:
-                    if len(pool_g2) < 1:
-                        unmet_reasons.append("For students offering exactly 4 G3 subjects, you must provide at least 1 eligible G2 subject (grade 1 to 4) for **Best 2 (B2)**.")
+                    # Scenario B: Student takes exactly 4 G3 subjects with at least 1 G2 subject
+                    elif g3_count == 4:
+                        if len(pool_g2) < 1:
+                            unmet_reasons.append("For students offering exactly 4 G3 subjects, you must provide at least 1 eligible G2 subject (grade 1 to 4) for **Best 2 (B2)**.")
+                        else:
+                            b2_sub = min(pool_g2, key=pool_g2.get)
+                            b2_score = pool_g2[b2_sub]  
+                            b2_source_is_g2 = True
                     else:
-                        b2_sub = min(pool_g2, key=pool_g2.get)
-                        b2_score = pool_g2[b2_sub]  # Kept exactly as it is on the G2 scale
-                        b2_source_is_g2 = True
-                else:
-                    unmet_reasons.append("An ELR2B2 score requires a minimum of 4 G3 subjects (EL, R1, R2, B1) and either a 5th G3 subject (mapped) or a G2 subject (as is) for B2.")
+                        unmet_reasons.append("An ELR2B2 score requires a minimum of 4 G3 subjects (EL, R1, R2, B1) and either a 5th G3 subject (mapped) or a G2 subject (as is) for B2.")
 
                 st.markdown(f"### 📊 Your {elr2b2_type.split(' ')[0]} Breakdown")
                 
