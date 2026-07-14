@@ -222,7 +222,6 @@ if selected_subjects:
     st.write("### Step 3: Select an Eligible Pathway to Explore")
     
     if eligible_options:
-        # --- MODIFIED: SPLIT TO DISPLAY ON SUCCESSIVE LINES ---
         st.write("This is based on your current subject combination.")
         st.write("Your eligibility depends on the grade-specific requirements.")
         
@@ -440,9 +439,8 @@ if selected_subjects:
             pfp_cluster = st.segmented_control(
                 label="Select your target PFP course track:",
                 options=[
-                    "Science Cluster", 
-                    "Humanities, Art, Media and Business Cluster", 
-                    "Design, Engineering and Technology Cluster and Sub-clusters"
+                    "Science, Design, Engineering and Technology Cluster", 
+                    "Humanities, Art, Media and Business Cluster"
                 ],
                 key="selected_pfp_cluster"
             )
@@ -457,7 +455,8 @@ if selected_subjects:
 
                 pfp_errors = []
                 
-                if pfp_cluster in ["Science Cluster", "Design, Engineering and Technology Cluster and Sub-clusters"]:
+                # Combined 'Science' and 'Design, Engineering and Technology' clusters logic
+                if pfp_cluster == "Science, Design, Engineering and Technology Cluster":
                     relevant_subject_pool = ["Design & Technology", "Nutrition and Food Science"] + science_subjects
                 else: 
                     relevant_subject_pool = [
