@@ -7,9 +7,10 @@ humanities_subjects = [
     "Literature in English", "History", "Geography", 
     "Humanities (Social Studies, Geography)", "Humanities (Social Studies, History)", 
     "Humanities (Social Studies, Literature in English)", "Economics", "Drama",
-    "Literature in Chinese", "Literature in Malay",
+    "Literature in Chinese", "Literature in Malay", "Literature in Tamil",
     "Humanities (Social Studies, Literature in Chinese)", 
-    "Humanities (Social Studies, Literature in Malay)"
+    "Humanities (Social Studies, Literature in Malay)", 
+    "Humanities (Social Studies, Literature in Tamil)"
 ]
 
 math_science_subjects = [
@@ -26,7 +27,8 @@ g3_only_subjects = [
     "Drama", "Spanish", "French", "German", "Japanese", "Physics", "Chemistry", 
     "Biology", "Electronics", "Music", "Higher Music", "Higher Art", "Biotechnology", 
     "Design Studies", "Higher Chinese", "Chinese (Special Programme)", "Literature in Chinese",
-    "Higher Malay", "Malay (Special Programme)", "Literature in Malay", "Higher Tamil", "Exercise And Sports Science", "Business"
+    "Higher Malay", "Malay (Special Programme)", "Literature in Malay", "Higher Tamil", 
+    "Literature in Tamil", "Exercise And Sports Science", "Business"
 ]
 
 overlapping_subjects = [
@@ -34,6 +36,7 @@ overlapping_subjects = [
     "History", "Geography", "Humanities (Social Studies, Geography)", 
     "Humanities (Social Studies, History)", "Humanities (Social Studies, Literature in English)", 
     "Humanities (Social Studies, Literature in Malay)", "Humanities (Social Studies, Literature in Chinese)",
+    "Humanities (Social Studies, Literature in Tamil)",
     "Computing", "Science (Physics, Chemistry)", "Science (Physics, Biology)", 
     "Science (Chemistry, Biology)", "Nutrition and Food Science", "Art", 
     "Design & Technology", "Principles of Accounts"
@@ -202,7 +205,7 @@ if selected_subjects:
 
     eligible_options = [name for name, info in pathways.items() if info["open"]]
 
-    # --- 5. STEP 3: PATHWAY BUTTON SELECTION & L1R4 CALCULATION ---
+    # --- 5. STEP 3: PATHWAY BUTTON SELECTION & CALCULATION ---
     st.write("---")
     st.write("### Step 3: Select an Eligible Pathway to Explore")
     
@@ -213,17 +216,17 @@ if selected_subjects:
             key="selected_exploration_pathway"
         )
         
+        # --- PATHWAY A: JUNIOR COLLEGE ---
         if chosen_pathway == "Junior College":
             st.success("🎉 You are exploring the **Junior College / Millennia Institute** pathway option.")
             
-            # --- L1R4 CALCULATION ALGORITHM (STRICTLY G3 ONLY) ---
+            # L1R4 CALCULATION ALGORITHM (STRICTLY G3 ONLY)
             g3_scores = {
                 sub: g3_points[grade] 
                 for sub, grade in subject_grades.items() 
                 if subject_levels[sub] == "G3"
             }
 
-            # A. Select L1 (English or HMT) from G3 pool
             l1_candidates = {}
             if "English Language" in g3_scores:
                 l1_candidates["English Language"] = g3_scores["English Language"]
@@ -238,13 +241,11 @@ if selected_subjects:
                 l1_sub = "None Available"
                 l1_score = 0
             
-            # B. Prepare remaining G3 subjects for relevant pools (Exclude selected L1)
             remaining_pool = {sub: score for sub, score in g3_scores.items() if sub != l1_sub}
             
             if l1_sub in hmt_subjects:
                 remaining_pool = {sub: score for sub, score in remaining_pool.items() if sub not in mt_subjects}
 
-            # C. Extract R1 and R2 (Best 2 G3 subjects from Humanities, Math, or Science)
             r1_r2_pool = {sub: score for sub, score in remaining_pool.items() if sub in humanities_subjects or sub in math_science_subjects}
             sorted_r1_r2 = sorted(r1_r2_pool.items(), key=lambda x: x[1])
             
@@ -256,18 +257,14 @@ if selected_subjects:
                 r_score_total += score
                 remaining_pool.pop(sub)
 
-            # D. Extract R3 and R4 (Best 2 remaining overall G3 subjects)
             sorted_r3_r4 = sorted(remaining_pool.items(), key=lambda x: x[1])
             for sub, score in sorted_r3_r4[:2]:
                 r_subjects_chosen.append((sub, score))
                 r_score_total += score
 
-            # E. Compute Final Sum
             l1r4_gross = l1_score + r_score_total
             
-            # --- DISPLAY SUMMARY CARD ---
             st.markdown("### 📊 Your MOE L1R4 Aggregate Breakdown (G3 Subjects Only)")
-            
             col_l1, col_r = st.columns(2)
             with col_l1:
                 st.info(f"**L1 Subject (G3):**\n* {l1_sub} → **Grade {l1_score}**")
@@ -279,8 +276,14 @@ if selected_subjects:
             else:
                 st.metric(label="Your Gross L1R4 Score", value=l1r4_gross)
                 
+        # --- PATHWAY B: POLYTECHNIC YEAR 1 ---
+        elif chosen_pathway == "Polytechnic Year 1":
+            st.success("🚀 You are exploring the **Polytechnic Year 1** pathway option.")
+            st.info("The configuration setup for Polytechnic Year 1 has been initialized. Calculation logic will be added next.")
+
+        # --- PATHWAY C: PFP ---
         elif chosen_pathway:
-            st.info(f"You have selected **{chosen_pathway}**. L1R4 calculations apply strictly to JC/MI criteria tracks.")
+            st.info(f"You have selected **{chosen_pathway}**.")
     else:
         st.warning("You do not currently qualify for any educational pathways based on these grades.")
 else:
