@@ -221,9 +221,13 @@ if selected_subjects:
     st.write("### Step 3: Select an Eligible Pathway to Explore")
     
     if eligible_options:
+        # --- ADDED REQUESTED LINE BELOW THE INITIAL HEADER ---
+        st.write("This is based on your current subject combination. Your eligibility depends on the grade-specific requirements.")
+        
         chosen_pathway = st.segmented_control(
             label="Select a pathway you are interested in learning:",
             options=eligible_options,
+            label_visibility="collapsed",  # Visual cleanup since heading clarifies purpose
             key="selected_exploration_pathway"
         )
         
@@ -285,7 +289,6 @@ if selected_subjects:
             else:
                 st.metric(label="Your Gross L1R4 Score", value=l1_r4_gross)
                 
-                # --- NEW: DETAILED SCORE AND ELIGIBILITY SEGREGATION ---
                 if l1_r4_gross <= 16:
                     st.success("✅ **Eligibility Status:** You are eligible for admission to **both** **Junior College (JC)** and **Millennia Institute (MI)**.")
                 elif l1_r4_gross <= 20:
