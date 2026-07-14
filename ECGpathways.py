@@ -337,7 +337,6 @@ if selected_subjects:
                 r1_eligible = {s: v for s, v in pool_g3.items() if s in g1_subjects}
                 if not r1_eligible:
                     if g3_count == 4:
-                        # Find if any of the user's Step 1 selections match the missing R1 criteria but are taken at G2
                         upgradeable_for_r1 = [s for s in selected_subjects if s in g1_subjects and subject_levels.get(s) == "G2"]
                         if upgradeable_for_r1:
                             subjects_str = ", ".join([f"**{s}**" for s in upgradeable_for_r1])
@@ -354,7 +353,6 @@ if selected_subjects:
                 r2_eligible = {s: v for s, v in pool_g3.items() if s in g2_subjects}
                 if not r2_eligible:
                     if g3_count == 4:
-                        # Find if any of the user's Step 1 selections match the missing R2 criteria but are taken at G2
                         upgradeable_for_r2 = [s for s in selected_subjects if s in g2_subjects and subject_levels.get(s) == "G2"]
                         if upgradeable_for_r2:
                             subjects_str = ", ".join([f"**{s}**" for s in upgradeable_for_r2])
@@ -383,7 +381,6 @@ if selected_subjects:
 
                 # 4. Evaluate Best 2 (B2)
                 if not unmet_reasons:
-                    # Scenario A: Student takes >= 5 G3 subjects (using the remaining pool_g3)
                     if g3_count >= 5:
                         if len(pool_g3) < 1:
                             unmet_reasons.append("Missing a 5th G3 subject to compute **Best 2 (B2)** via grade mapping.")
@@ -392,8 +389,6 @@ if selected_subjects:
                             orig_g3_grade = g3_subs[b2_sub]
                             b2_score = map_g3_to_g2_points(orig_g3_grade)
                             b2_source_is_g2 = False
-
-                    # Scenario B: Student takes exactly 4 G3 subjects with at least 1 G2 subject
                     elif g3_count == 4:
                         if len(pool_g2) < 1:
                             unmet_reasons.append("For students offering exactly 4 G3 subjects, you must provide at least 1 eligible G2 subject (grade 1 to 4) for **Best 2 (B2)**.")
@@ -421,9 +416,24 @@ if selected_subjects:
                     elr2b2_gross = el_score + r1_score + r2_score + b1_score + b2_score
                     st.metric(label="Calculated Gross ELR2B2 Score", value=elr2b2_gross)
 
-        # --- PATHWAY C: PFP ---
-        elif chosen_pathway:
-            st.info(f"You have selected **{chosen_pathway}**.")
+        # --- PATHWAY C: POLYTECHNIC FOUNDATION PROGRAMME (PFP) ---
+        elif chosen_pathway == "Polytechnic Foundation Programme":
+            st.success("🎓 You are exploring the **Polytechnic Foundation Programme (PFP)** pathway option.")
+            
+            # Button format using segmented control to match UI profile
+            pfp_cluster = st.segmented_control(
+                label="Select your target PFP course track:",
+                options=[
+                    "Cluster A (Sciences, Design, Engineering & Technology, Nursing)", 
+                    "Cluster B (Humanities, Art, Media & Business, Early Childhood)"
+                ],
+                key="selected_pfp_cluster"
+            )
+            
+            if pfp_cluster:
+                st.markdown(f"### 📊 {pfp_cluster.split(' (')[0]} Aggregate Computation")
+                st.info("💡 Complete dynamic logic for PFP scoring groups will run here according to the subject grade data.")
+                
     else:
         st.warning("You do not currently qualify for any educational pathways based on these grades.")
 else:
