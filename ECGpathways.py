@@ -312,7 +312,8 @@ if selected_subjects:
                 with col_l1:
                     st.info(f"**L1 Subject (G3):**\n* {best_l1_sub} → **Grade {g3_scores[best_l1_sub]}**")
                 with col_r:
-                    st.info(f"**Relevant R1–R4 Subjects (G3):**\n" + "\n".join([f"* {s} ({cat}) → **Grade {sc}**" for s, sc, cat in best_r_subjects]))
+                    # Formatted breakdown to match "Category: Subject -> Grade Score" structure
+                    st.info(f"**Relevant R1–R4 Subjects (G3):**\n" + "\n".join([f"* {cat}: {s} → **Grade {sc}**" for s, sc, cat in best_r_subjects]))
                 
                 st.metric(label="Your Gross L1R4 Score", value=best_gross_l1r4)
                 
