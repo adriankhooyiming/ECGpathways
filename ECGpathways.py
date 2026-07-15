@@ -236,12 +236,14 @@ if selected_subjects:
         if chosen_pathway == "Junior College / MI":
             st.success("🎉 You are exploring the **Junior College / Millennia Institute** pathway option.")
             
+            # Map G3 grades to numerical points
             g3_scores = {
                 sub: g3_points[grade] 
                 for sub, grade in subject_grades.items() 
                 if subject_levels[sub] == "G3"
             }
 
+            # Determine L1 Candidates (English or Higher Mother Tongues)
             l1_candidates = {}
             if "English Language" in g3_scores:
                 l1_candidates["English Language"] = g3_scores["English Language"]
@@ -249,50 +251,74 @@ if selected_subjects:
                 if hmt in g3_scores:
                     l1_candidates[hmt] = g3_scores[hmt]
             
-            if l1_candidates:
-                l1_sub = min(l1_candidates, key=l1_candidates.get)
-                l1_score = l1_candidates[l1_sub]
-            else:
-                l1_sub = "None Available"
-                l1_score = 0
+            best_gross_l1r4 = float('inf')
+            best_l1_sub = "None Available"
+            best_r_subjects = []
             
-            remaining_pool = {sub: score for sub, score in g3_scores.items() if sub != l1_sub}
-            if l1_sub in hmt_subjects:
-                remaining_pool = {sub: score for sub, score in remaining_pool.items() if sub not in mt_subjects}
-
-            r1_r2_pool = {sub: score for sub, score in remaining_pool.items() if sub in humanities_subjects or sub in math_science_subjects}
-            sorted_r1_r2 = sorted(r1_r2_pool.items(), key=lambda x: x[1])
-            
-            r_subjects_chosen = []
-            r_score_total = 0
-            
-            for sub, score in sorted_r1_r2[:2]:
-                r_subjects_chosen.append((sub, score))
-                r_score_total += score
-                remaining_pool.pop(sub)
-
-            sorted_r3_r4 = sorted(remaining_pool.items(), key=lambda x: x[1])
-            for sub, score in sorted_r3_r4[:2]:
-                r_subjects_chosen.append((sub, score))
-                r_score_total += score
-
-            l1_r4_gross = l1_score + r_score_total
-            
-            st.markdown("### 📊 Your MOE L1R4 Aggregate Breakdown (G3 Subjects Only)")
-            col_l1, col_r = st.columns(2)
-            with col_l1:
-                st.info(f"**L1 Subject (G3):**\n* {l1_sub} → **Grade {l1_score}**")
-            with col_r:
-                st.info(f"**Relevant R1–R4 Subjects (G3):**\n" + "\n".join([f"* {s} → **Grade {sc}**" for s, sc in r_subjects_chosen]))
-            
-            if len(r_subjects_chosen) < 4 or l1_score == 0:
-                st.warning(f"⚠️ **Note:** You only have {len(r_subjects_chosen) + (1 if l1_score > 0 else 0)} eligible G3 subjects. A complete L1R4 calculation requires at least 5 G3 level subjects.")
-            else:
-                st.metric(label="Your Gross L1R4 Score", value=l1_r4_gross)
+            # Evaluate each valid L1 option to construct the best possible L1R4
+            for l1_sub, l1_score in l1_candidates.items():
+                # Establish the remaining subject pool
+                pool = {sub: score for sub, score in g3_scores.items() if sub != l1_sub}
                 
-                if l1_r4_gross <= 16:
+                # Apply Double Counting Guardrail: If Higher MTL is L1, standard Mother Tongue cannot be used
+                if l1_sub in hmt_subjects:
+                    pool = {sub: score for sub, score in pool.items() if sub not in mt_subjects}
+                
+                # R1: Any 1 best-scoring G3 subject from Humanities
+                r1_candidates = {sub: score for sub, score in pool.items() if sub in humanities_subjects}
+                if not r1_candidates:
+                    continue  # Invalid combination
+                r1_sub = min(r1_candidates, key=r1_candidates.get)
+                r1_score = pool.pop(r1_sub)
+                
+                # R2: Any 1 best-scoring G3 subject from Mathematics or Science
+                r2_candidates = {sub: score for sub, score in pool.items() if sub in math_science_subjects}
+                if not r2_candidates:
+                    continue  # Invalid combination
+                r2_sub = min(r2_candidates, key=r2_candidates.get)
+                r2_score = pool.pop(r2_sub)
+                
+                # R3: Any 1 best-scoring G3 subject from Humanities, Mathematics, or Science
+                r3_candidates = {sub: score for sub, score in pool.items() if sub in humanities_subjects or sub in math_science_subjects}
+                if not r3_candidates:
+                    continue  # Invalid combination
+                r3_sub = min(r3_candidates, key=r3_candidates.get)
+                r3_score = pool.pop(r3_sub)
+                
+                # R4: Any 1 best-scoring remaining G3 subject
+                if not pool:
+                    continue  # Invalid combination (minimum of 5 subjects needed)
+                r4_sub = min(pool, key=pool.get)
+                r4_score = pool[r4_sub]
+                
+                total_gross = l1_score + r1_score + r2_score + r3_score + r4_score
+                
+                if total_gross < best_gross_l1r4:
+                    best_gross_l1r4 = total_gross
+                    best_l1_sub = l1_sub
+                    best_r_subjects = [
+                        (r1_sub, r1_score, "R1 (Humanities)"),
+                        (r2_sub, r2_score, "R2 (Math/Science)"),
+                        (r3_sub, r3_score, "R3 (Humanities/Math/Science)"),
+                        (r4_sub, r4_score, "R4 (Other Best)")
+                    ]
+
+            st.markdown("### 📊 Your MOE L1R4 Aggregate Breakdown (G3 Subjects Only)")
+            
+            if best_gross_l1r4 == float('inf') or len(best_r_subjects) < 4:
+                st.warning(f"⚠️ **Note:** You only have {len(g3_scores)} eligible G3 subjects. A complete L1R4 calculation requires at least 5 G3-level subjects containing the appropriate subject distributions (Humanities, Math, and Science).")
+            else:
+                col_l1, col_r = st.columns(2)
+                with col_l1:
+                    st.info(f"**L1 Subject (G3):**\n* {best_l1_sub} → **Grade {g3_scores[best_l1_sub]}**")
+                with col_r:
+                    st.info(f"**Relevant R1–R4 Subjects (G3):**\n" + "\n".join([f"* {s} ({cat}) → **Grade {sc}**" for s, sc, cat in best_r_subjects]))
+                
+                st.metric(label="Your Gross L1R4 Score", value=best_gross_l1r4)
+                
+                if best_gross_l1r4 <= 16:
                     st.success("✅ **Eligibility Status:** You are eligible for admission to **both** **Junior College (JC)** and **Millennia Institute (MI)**.")
-                elif l1_r4_gross <= 20:
+                elif best_gross_l1r4 <= 20:
                     st.warning("⚠️ **Eligibility Status:** You are eligible for **Millennia Institute (MI)** admission only. (Your score exceeds 16, so you do not qualify for Junior College admission).")
                 else:
                     st.error("❌ **Eligibility Status:** Your L1R4 aggregate score exceeds 20. You are **not eligible** for both Junior College and Millennia Institute admission.")
