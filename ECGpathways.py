@@ -13,7 +13,7 @@ humanities_subjects = [
     "Humanities (Social Studies, Literature in Malay)"
 ]
 
-# Individual and combined sciences
+# Individual and combined sciences (G2/G3 level)
 science_subjects = [
     "Physics", "Chemistry", "Biology",
     "Science (Physics, Chemistry)", "Science (Physics, Biology)", "Science (Chemistry, Biology)"
@@ -39,28 +39,40 @@ overlapping_subjects = [
     "English Language", "Mathematics", "Additional Mathematics", "Literature in English", 
     "History", "Geography", "Humanities (Social Studies, Geography)", 
     "Humanities (Social Studies, History)", "Humanities (Social Studies, Literature in English)", 
-    "Humanities (Social Studies, Literature in Malay)", "Humanities (Social Studies, Literature in Chinese)",
+    "Humanities (Social Studies, Literature in Malay)", "Humanities (Social Studies, Literature in Chinese)", 
     "Computing", "Nutrition and Food Science", "Art", 
     "Design & Technology", "Principles of Accounts"
 ] + mt_subjects + science_subjects
 
-all_selectable_subjects = sorted(list(set(g3_only_subjects + overlapping_subjects)))
+# Subjects eligible for G1 level selection
+g1_eligible_subjects = [
+    "English Language", "Mathematics", "Nutrition and Food Science", 
+    "Art", "Computing", "Design & Technology", "Chinese Language", 
+    "Malay Language", "Tamil Language", "Science"
+]
+
+# Subjects strictly restricted to G1 level only
+g1_only_subjects = ["Science"]
+
+all_selectable_subjects = sorted(list(set(g3_only_subjects + overlapping_subjects + g1_eligible_subjects)))
 
 # Grade score mapping to raw points
 g3_grades = ["A1", "A2", "B3", "B4", "C5", "C6", "D7", "E8", "9"]
 g3_points = {"A1": 1, "A2": 2, "B3": 3, "B4": 4, "C5": 5, "C6": 6, "D7": 7, "E8": 8, "9": 9}
 g2_grades = ["1", "2", "3", "4", "5", "6"]
+g1_grades = ["A", "B", "C", "D", "E"]
 
 # --- MOE Mapping: G3 to G2 Equivalent Points ---
 def map_to_g2_points(level, grade):
     if level == "G2":
         return int(grade)
-    else: # G3 Level Mapping
+    elif level == "G3": # G3 Level Mapping
         if grade in ["A1", "A2", "B3"]: return 1
         elif grade in ["B4", "C5", "C6"]: return 2
         elif grade == "D7": return 3
         elif grade == "E8": return 4
-        return 9 
+        return 9
+    return 9 # Fallback/G1 default
 
 def check_g3_at_least(grade, target):
     if grade not in g3_grades: return False
@@ -93,7 +105,28 @@ if selected_subjects:
                 st.markdown(f"**{subject}**")
                 
             with col2:
-                if subject in overlapping_subjects:
+                # Determine allowed level options per subject
+                if subject in g1_only_subjects:
+                    st.segmented_control(
+                        label=f"Level for {subject}",
+                        options=["G1"],
+                        default="G1",
+                        disabled=True,
+                        label_visibility="collapsed",
+                        key=f"level_{subject}"
+                    )
+                    subject_levels[subject] = "G1"
+                elif subject in g1_eligible_subjects:
+                    level_options = ["G1", "G2", "G3"] if subject in overlapping_subjects else ["G1", "G3"]
+                    chosen_level = st.segmented_control(
+                        label=f"Level for {subject}",
+                        options=level_options,
+                        default="G3",
+                        label_visibility="collapsed",
+                        key=f"level_{subject}"
+                    )
+                    subject_levels[subject] = chosen_level if chosen_level else "G3"
+                elif subject in overlapping_subjects:
                     chosen_level = st.segmented_control(
                         label=f"Level for {subject}",
                         options=["G2", "G3"],
@@ -115,7 +148,12 @@ if selected_subjects:
             
             with col3:
                 current_level = subject_levels[subject]
-                available_grades = g3_grades if current_level == "G3" else g2_grades
+                if current_level == "G3":
+                    available_grades = g3_grades
+                elif current_level == "G2":
+                    available_grades = g2_grades
+                else:
+                    available_grades = g1_grades
                 
                 chosen_grade = st.selectbox(
                     label=f"Grade for {subject}",
@@ -128,6 +166,7 @@ if selected_subjects:
     # --- 4. DATA PROCESSING & EVALUATION ---
     g3_count = sum(1 for lvl in subject_levels.values() if lvl == "G3")
     g2_count = sum(1 for lvl in subject_levels.values() if lvl == "G2")
+    g1_count = sum(1 for lvl in subject_levels.values() if lvl == "G1")
     total_g2_g3_count = g3_count + g2_count
     
     pathways = {
@@ -199,7 +238,7 @@ if selected_subjects:
                     mt_passed = True
                     break
                 else:
-                    req_grade = "D7" if lvl == "G3" else "5"
+                    req_grade = "D7" if lvl == "G3" else ("5" if lvl == "G2" else "N/A (G1 not eligible)")
                     mt_failures.append(f"{mt} at the {lvl} level should have a minimum grade of {req_grade}.")
 
     if not mt_passed:
@@ -475,7 +514,7 @@ if selected_subjects:
                 g2_equivalent_pool = {}
                 for sub, grade in subject_grades.items():
                     level = subject_levels[sub]
-                    if (level == "G3" and grade == "9") or (level == "G2" and grade in ["5", "6"]):
+                    if level == "G1" or (level == "G3" and grade == "9") or (level == "G2" and grade in ["5", "6"]):
                         continue
                     g2_equivalent_pool[sub] = map_to_g2_points(level, grade)
 
