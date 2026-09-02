@@ -61,8 +61,9 @@ g3_grades = ["A1", "A2", "B3", "B4", "C5", "C6", "D7", "E8", "9"]
 g3_points = {"A1": 1, "A2": 2, "B3": 3, "B4": 4, "C5": 5, "C6": 6, "D7": 7, "E8": 8, "9": 9}
 g2_grades = ["1", "2", "3", "4", "5", "6"]
 g1_grades = ["A", "B", "C", "D", "E"]
+g1_points = {"A": 1, "B": 2, "C": 3, "D": 4, "E": 5}
 
-# --- MOE Mapping: G3 to G2 Equivalent Points ---
+# --- MOE MAPPING FUNCTIONS ---
 def map_to_g2_points(level, grade):
     if level == "G2":
         return int(grade)
@@ -73,6 +74,23 @@ def map_to_g2_points(level, grade):
         elif grade == "E8": return 4
         return 9
     return 9 # Fallback/G1 default
+
+def map_to_g1_points(level, grade):
+    """Maps G3, G2, or G1 grades to G1 equivalent numerical points based on MOE Mapping Table."""
+    if level == "G1":
+        return g1_points.get(grade, 5)
+    elif level == "G2":
+        if grade in ["1", "2", "3"]: return 1 # Maps to G1 Grade A
+        elif grade == "4": return 2           # Maps to G1 Grade B
+        elif grade == "5": return 3           # Maps to G1 Grade C
+        elif grade == "6": return 4           # Maps to G1 Grade D
+        return 5
+    elif level == "G3":
+        if grade in ["A1", "A2", "B3", "B4", "C5", "C6", "D7"]: return 1 # Maps to G1 Grade A
+        elif grade == "E8": return 2                                     # Maps to G1 Grade B
+        elif grade == "9": return 3                                      # Maps to G1 Grade C
+        return 5
+    return 5
 
 def check_g3_at_least(grade, target):
     if grade not in g3_grades: return False
@@ -168,11 +186,13 @@ if selected_subjects:
     g2_count = sum(1 for lvl in subject_levels.values() if lvl == "G2")
     g1_count = sum(1 for lvl in subject_levels.values() if lvl == "G1")
     total_g2_g3_count = g3_count + g2_count
+    total_subjects_count = len(subject_levels)
     
     pathways = {
         "Junior College / MI": {"open": False, "reason": []},
         "Polytechnic Year 1": {"open": False, "reason": []},
-        "Polytechnic Foundation Programme": {"open": False, "reason": []}
+        "Polytechnic Foundation Programme": {"open": False, "reason": []},
+        "3-Year Higher Nitec": {"open": False, "reason": []}
     }
     
     # --- JUNIOR COLLEGE ELIGIBILITY CHECK ---
@@ -253,6 +273,7 @@ if selected_subjects:
 
     if g3_count >= 4: pathways["Polytechnic Year 1"]["open"] = True
     if total_g2_g3_count >= 5: pathways["Polytechnic Foundation Programme"]["open"] = True
+    if total_subjects_count >= 4: pathways["3-Year Higher Nitec"]["open"] = True
 
     eligible_options = [name for name, info in pathways.items() if info["open"]]
 
@@ -275,14 +296,12 @@ if selected_subjects:
         if chosen_pathway == "Junior College / MI":
             st.success("🎉 You are exploring the **Junior College / Millennia Institute** pathway option.")
             
-            # Map G3 grades to numerical points
             g3_scores = {
                 sub: g3_points[grade] 
                 for sub, grade in subject_grades.items() 
                 if subject_levels[sub] == "G3"
             }
 
-            # Determine L1 Candidates (English or Higher Mother Tongues)
             l1_candidates = {}
             if "English Language" in g3_scores:
                 l1_candidates["English Language"] = g3_scores["English Language"]
@@ -294,39 +313,32 @@ if selected_subjects:
             best_l1_sub = "None Available"
             best_r_subjects = []
             
-            # Evaluate each valid L1 option to construct the best possible L1R4
             for l1_sub, l1_score in l1_candidates.items():
-                # Establish the remaining subject pool
                 pool = {sub: score for sub, score in g3_scores.items() if sub != l1_sub}
                 
-                # Apply Double Counting Guardrail: If Higher MTL is L1, standard Mother Tongue cannot be used
                 if l1_sub in hmt_subjects:
                     pool = {sub: score for sub, score in pool.items() if sub not in mt_subjects}
                 
-                # R1: Any 1 best-scoring G3 subject from Humanities
                 r1_candidates = {sub: score for sub, score in pool.items() if sub in humanities_subjects}
                 if not r1_candidates:
-                    continue  # Invalid combination
+                    continue
                 r1_sub = min(r1_candidates, key=r1_candidates.get)
                 r1_score = pool.pop(r1_sub)
                 
-                # R2: Any 1 best-scoring G3 subject from Mathematics or Science
                 r2_candidates = {sub: score for sub, score in pool.items() if sub in math_science_subjects}
                 if not r2_candidates:
-                    continue  # Invalid combination
+                    continue
                 r2_sub = min(r2_candidates, key=r2_candidates.get)
                 r2_score = pool.pop(r2_sub)
                 
-                # R3: Any 1 best-scoring G3 subject from Humanities, Mathematics, or Science
                 r3_candidates = {sub: score for sub, score in pool.items() if sub in humanities_subjects or sub in math_science_subjects}
                 if not r3_candidates:
-                    continue  # Invalid combination
+                    continue
                 r3_sub = min(r3_candidates, key=r3_candidates.get)
                 r3_score = pool.pop(r3_sub)
                 
-                # R4: Any 1 best-scoring remaining G3 subject
                 if not pool:
-                    continue  # Invalid combination (minimum of 5 subjects needed)
+                    continue
                 r4_sub = min(pool, key=pool.get)
                 r4_score = pool[r4_sub]
                 
@@ -409,7 +421,6 @@ if selected_subjects:
                 b2_sub, b2_score = None, None
                 b2_source_is_g2 = False
 
-                # 1. Evaluate R1
                 r1_eligible = {s: v for s, v in pool_g3.items() if s in g1_subjects}
                 if not r1_eligible:
                     unmet_reasons.append(f"Missing an eligible G3 subject from the **1st Group of Relevant Subjects (R1)** required for {elr2b2_type.split(' ')[0]}.")
@@ -424,7 +435,6 @@ if selected_subjects:
                     r1_sub = min(r1_eligible, key=r1_eligible.get)
                     r1_score = pool_g3.pop(r1_sub)
                 
-                # 2. Evaluate R2
                 r2_eligible = {s: v for s, v in pool_g3.items() if s in g2_subjects}
                 if not r2_eligible:
                     unmet_reasons.append(f"Missing an eligible G3 subject from the **2nd Group of Relevant Subjects (R2)** required for {elr2b2_type.split(' ')[0]}.")
@@ -444,7 +454,6 @@ if selected_subjects:
                     pool_g3 = {s: v for s, v in pool_g3.items() if s not in mt_subjects}
                     pool_g2 = {s: v for s, v in pool_g2.items() if s not in mt_subjects}
                 
-                # 3. Evaluate Best 1 (B1)
                 sorted_g3_rem = sorted(pool_g3.items(), key=lambda x: x[1])
                 if len(sorted_g3_rem) < 1 and not unmet_reasons:
                     unmet_reasons.append("Insufficient remaining G3 subjects to satisfy the **Best 1 (B1)** requirement.")
@@ -452,7 +461,6 @@ if selected_subjects:
                     b1_sub, b1_score = sorted_g3_rem[0]
                     pool_g3.pop(b1_sub)
 
-                # 4. Evaluate Best 2 (B2)
                 if not unmet_reasons:
                     if g3_count >= 5:
                         if len(pool_g3) < 1:
@@ -497,7 +505,7 @@ if selected_subjects:
                         st.metric(label="Calculated Gross ELR2B2 Score", value=elr2b2_gross)
                         st.error(f"❌ Gross aggregate score is {elr2b2_gross}, which exceeds the maximum allowable Polytechnic admission limit of 22. You are not eligible for this pathway.")
 
-        # --- PATHWAY C: POLYTECHNIC FOUNDATION PROGRAMME (PFP ELMAB3 Detailed Validation) ---
+        # --- PATHWAY C: POLYTECHNIC FOUNDATION PROGRAMME ---
         elif chosen_pathway == "Polytechnic Foundation Programme":
             st.success("🎓 You are exploring the **Polytechnic Foundation Programme (PFP)** pathway option.")
             
@@ -520,7 +528,6 @@ if selected_subjects:
 
                 pfp_errors = []
                 
-                # Combined 'Science' and 'Design, Engineering and Technology' clusters logic
                 if pfp_cluster == "Science, Design, Engineering and Technology Cluster":
                     relevant_subject_pool = ["Design & Technology", "Nutrition and Food Science"] + science_subjects
                 else: 
@@ -615,6 +622,39 @@ if selected_subjects:
                     else:
                         st.metric(label="Your Gross ELMAB3 Score", value=elmab3_gross)
                         st.error(f"❌ Gross aggregate score is {elmab3_gross}, which exceeds the maximum allowable PFP ceiling of 12.")
+
+        # --- PATHWAY D: 3-YEAR HIGHER NITEC ---
+        elif chosen_pathway == "3-Year Higher Nitec":
+            st.success("🛠️ You are exploring the **3-Year Higher Nitec** pathway option.")
+            
+            g1_mapped_scores = {}
+            mapping_details = []
+            
+            for sub, grade in subject_grades.items():
+                level = subject_levels[sub]
+                pts = map_to_g1_points(level, grade)
+                g1_mapped_scores[sub] = pts
+                
+                g1_letter = "A" if pts == 1 else ("B" if pts == 2 else ("C" if pts == 3 else ("D" if pts == 4 else "E")))
+                mapping_details.append(f"* **{sub}** ({level} Grade: {grade}) $\\rightarrow$ **G1 Grade {g1_letter} ({pts} pt/s)**")
+            
+            if len(g1_mapped_scores) < 4:
+                st.error("❌ You need at least 4 subjects to compute a 3-Year Higher Nitec aggregate score.")
+            else:
+                sorted_g1_subs = sorted(g1_mapped_scores.items(), key=lambda x: x[1])
+                best_4_subs = sorted_g1_subs[:4]
+                gross_score = sum(val for _, val in best_4_subs)
+                
+                st.markdown("### 📊 Your Best 4 Subjects Aggregate Breakdown (G1 Equivalent)")
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    b4_text = "\n".join([f"* **{s}:** {sc} pt/s" for s, sc in best_4_subs])
+                    st.info(f"**Best 4 Selected Subjects:**\n{b4_text}")
+                with col2:
+                    st.info("**Subject Level & Downward Grade Mapping:**\n" + "\n".join(mapping_details))
+                
+                st.metric(label="Your 3-Year Higher Nitec Aggregate Score (Best 4)", value=gross_score)
 
     else:
         st.warning("You do not currently qualify for any educational pathways based on these grades.")
